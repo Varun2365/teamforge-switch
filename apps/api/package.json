@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "seed": "tsx src/db/seed.ts",
     "demo": "tsx src/demo/demo.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "reset:company": "tsx src/db/reset-company.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

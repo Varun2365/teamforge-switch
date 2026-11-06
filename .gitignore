@@ -13,3 +13,6 @@ apps/api/brain/opencode.json
 apps/api/brain/inbox-*.md
 apps/api/brain/test-out*
 apps/api/live.log
+
+# Local-only demo/recording runbook
+RECORDING.md
