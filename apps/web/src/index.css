@@ -401,7 +401,19 @@ body {
 }
 
 .tf-card.fill {
+  display: flex;
   height: 100%;
+  flex-direction: column;
+}
+
+.tf-card.fill .ant-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.tf-card.fill .ant-card-body > .empty-state {
+  flex: 1;
 }
 
 .tf-card .ant-card-head {

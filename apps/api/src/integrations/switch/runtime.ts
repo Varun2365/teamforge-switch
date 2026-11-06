@@ -849,6 +849,8 @@ class SwitchRuntime {
 
     if (config.AI_FALLBACK_DETERMINISTIC) {
       logger.warn({ error: ai.error, agent: agent.key }, 'AI brain unavailable — using deterministic fallback for this message');
+      // Reset the room's AI session so the next attempt starts clean if the model wedged.
+      await ConversationModel.updateOne({ orgId: this.organizationId, roomId: input.roomId }, { $unset: { aiSessionId: '' } }).catch(() => undefined);
       const fb = await respondAsAgent({
         organizationId: this.organizationId,
         roomId: input.roomId,

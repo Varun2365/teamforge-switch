@@ -292,7 +292,7 @@ export default function OverviewPage() {
               to="/approvals"
               icon={<InboxOutlined />}
               tone={data.pendingApprovals > 0 ? 'warning' : undefined}
-              title="Approvals waiting on a human"
+              title="Approvals pending"
               description="Consequential actions never approve themselves."
               count={data.pendingApprovals}
             />
@@ -367,6 +367,7 @@ export default function OverviewPage() {
         <Row gutter={[20, 20]}>
           <Col xs={24} xl={9}>
             <Panel
+              className="fill"
               title="Recent decisions"
               action={
                 <Link to="/memory" className="panel-link">
@@ -402,6 +403,7 @@ export default function OverviewPage() {
 
           <Col xs={24} xl={15}>
             <Panel
+              className="fill"
               title="Agent activity"
               action={
                 <Link to="/agents" className="panel-link">
