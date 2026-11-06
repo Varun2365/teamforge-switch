@@ -19,7 +19,7 @@
     "check:mcp": "node scripts/check-mcp.mjs",
     "verify:switch": "node scripts/verify-switch.mjs",
     "demo": "npm run check:mcp -- get_organization_overview {}",
-    "reset:company": "npm run reset:company -w @teamforge/api"
+    "reset:company": "npm run reset:company -w @teamforge/api --"
   },
   "engines": {
     "node": ">=20"
