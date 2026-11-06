@@ -1,16 +1,18 @@
 # TEAMFORGE
 
-**Your team's AI operations manager — living in your Switch room.**
+**An AI teammate that keeps your team's work moving — inside your Switch chat.**
 
-People talk in Discord. TEAMFORGE listens, understands the work, remembers the organization, creates and tracks the real tasks, and answers like a teammate — not a chatbot. It joins the right people and agents to a task, follows up when things slip, and quietly keeps organizational memory accurate.
+TEAMFORGE is an AI operations manager for a team. People just talk in Discord: it understands what's happening, remembers who does what, creates and tracks the actual tasks, and replies in short, human language. It also follows up by itself — reminders, deadlines, blockers — so nothing depends on someone chasing.
 
-Every conversation, agent identity and reply runs through **Switch**. Nothing is faked: no demo people, no scripted answers, no simulated collaboration.
+Everything runs through **Switch**: the six agents, the shared room, and every message. You don't need to learn a tool or type commands. You talk, and the work gets organized.
 
-> *"Who's handling QA, and what's it waiting on?"* → the agent checks the real board and dependencies, names the owner, and tells you what's blocked.
+No demo data. No scripted answers. The organization is built from your real conversation.
+
+> *"Who's handling QA, and what's it waiting on?"* → it checks the real board, names the owner and the blocker.
 >
-> *"Remind me tomorrow at 10 to review the launch plan."* → a real reminder is stored and delivered in the room.
+> *"Remind me tomorrow at 10 to review the launch plan."* → the reminder is saved and delivered in the room.
 >
-> *"Rahul's API is blocked by the payment provider."* → the agent records the blocker, traces the impact to launch, and offers a plan.
+> *"The API is blocked by the payment provider."* → it records the blocker, traces the impact on launch, and suggests what to do.
 
 ---
 
