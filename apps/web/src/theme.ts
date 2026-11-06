@@ -105,6 +105,8 @@ export const themeConfig: ThemeConfig = {
     Tag: {
       borderRadiusSM: 6,
       fontSizeSM: 12,
+      defaultBg: '#f1f5f9',
+      defaultColor: '#475569',
     },
     Segmented: {
       trackBg: '#eef2f7',

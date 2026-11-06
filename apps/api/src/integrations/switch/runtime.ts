@@ -878,7 +878,7 @@ class SwitchRuntime {
       message: input.message,
       recent,
       snapshot,
-      sessionId: conversation?.aiSessionId ?? null,
+      sessionId: null, // fresh session per message: context comes from the snapshot + recent log, so a wedged session can never block replies
     });
 
     if (ai.ok && ai.body) {

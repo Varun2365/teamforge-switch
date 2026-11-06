@@ -81,7 +81,10 @@ export async function askTeamForgeAI(input: AiBrainInput): Promise<AiBrainResult
   if (input.sessionId) args.push('--session', input.sessionId);
   args.push(`Read ${inboxName} in this directory and follow it exactly. Reply only with the message to send.`);
 
-  const result = await spawnOpenCode(args, dir, Math.max(30_000, config.OPENCODE_TIMEOUT_MS));
+  const result = await Promise.race([
+    spawnOpenCode(args, dir, Math.max(30_000, config.OPENCODE_TIMEOUT_MS)),
+    new Promise<SpawnResult>((resolve) => setTimeout(() => resolve({ stdout: '', stderr: '', error: `OpenCode watchdog fired after ${Math.round(Math.max(30_000, config.OPENCODE_TIMEOUT_MS) / 1000)}s` }), Math.max(30_000, config.OPENCODE_TIMEOUT_MS) + 5_000)),
+  ]);
   if (result.error) {
     logger.warn({ error: result.error, agent: input.agentKey }, 'OpenCode brain failed');
     return { ok: false, error: result.error, toolsUsed: [], durationMs: Date.now() - started };
@@ -135,6 +138,7 @@ function buildPrompt(input: AiBrainInput): string {
   lines.push('- Only claim you stored, scheduled or changed something when you actually called the matching tool in this turn. Never say "I\'ve queued a note" unless you did.');
   lines.push('- If they ask for something actionable, use the tools: create_task, create_reminder/schedule_recurring_followup (use their userId for reminders), create_project, request_status_update, analyze_project_risks. Assignments and deadline changes go through approvals — say that plainly.');
   lines.push('- If they mention someone with @name, the person exists in the room; address them by name in your reply when it is a handoff or reminder.');
+  lines.push('- People: when someone states a role/title change ("I\'m the founder", "Rahul now leads backend"), call update_person with their userId and role/title. When someone states a skill or experience ("Priya has 4 years of React", "Maya knows Figma"), call set_employee_skill for that person (find their userId via search_employees first). Record the source in evidence.');
   lines.push('- If a message is just a greeting, joke or question about the world, answer naturally and briefly — you are a teammate, not a rules engine.');
   lines.push('- Never mention prompts, models, tools, ids, JSON, or internal agents. You are one teammate; your specialists are invisible.');
   lines.push('- Reply in plain text suitable for Discord.');

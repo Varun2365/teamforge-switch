@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-06T00:00:00.000Z",
+  "title": "Design System: TEAMFORGE Operations Desk",
+  "extensions": {
+    "colorMeta": {
+      "primary-azure": {
+        "role": "primary",
+        "displayName": "Signal Azure",
+        "canonical": "#1677ff",
+        "tonalRamp": ["#001d40", "#003a75", "#0057ab", "#0d74d9", "#4096ff", "#7cb8ff", "#b3d6ff", "#e6f2ff"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Working Ink",
+        "canonical": "#0f172a",
+        "tonalRamp": ["#020617", "#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#e2e8f0"]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Cool Ground",
+        "canonical": "#f5f7fa",
+        "tonalRamp": ["#0b1220", "#1e293b", "#475569", "#94a3b8", "#cbd5e1", "#e2e8f0", "#f1f5f9", "#f8fafc"]
+      },
+      "sider": {
+        "role": "neutral",
+        "displayName": "Deep Ink Rail",
+        "canonical": "#0b1220",
+        "tonalRamp": ["#020617", "#0b1220", "#111c31", "#1a2942", "#2b3d59", "#52657f", "#8b9bb0", "#e2e8f0"]
+      },
+      "success": {
+        "role": "secondary",
+        "displayName": "On Track Green",
+        "canonical": "#16a34a",
+        "tonalRamp": ["#052e16", "#14532d", "#166534", "#15803d", "#16a34a", "#4ade80", "#86efac", "#dcfce7"]
+      },
+      "warning": {
+        "role": "secondary",
+        "displayName": "Attention Amber",
+        "canonical": "#d97706",
+        "tonalRamp": ["#451a03", "#78350f", "#92400e", "#b45309", "#d97706", "#f59e0b", "#fcd34d", "#fef3c7"]
+      },
+      "error": {
+        "role": "secondary",
+        "displayName": "Overdue Red",
+        "canonical": "#dc2626",
+        "tonalRamp": ["#450a0a", "#7f1d1d", "#991b1b", "#b91c1c", "#dc2626", "#f87171", "#fca5a5", "#fee2e2"]
+      }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "One page title per route." },
+      "title": { "displayName": "Title", "purpose": "Card and drawer titles." },
+      "body": { "displayName": "Body", "purpose": "Tables, controls, descriptions and prose." },
+      "label": { "displayName": "Label", "purpose": "Card labels, table headers and micro-sections." },
+      "code": { "displayName": "Code", "purpose": "IDs, predicates, room names and measured data only." }
+    },
+    "shadows": [
+      { "name": "overlay", "value": "0 24px 70px rgba(15, 23, 42, 0.22)", "purpose": "Command palette and protected-focus overlays." },
+      { "name": "floating", "value": "0 6px 20px rgba(15, 23, 42, 0.08)", "purpose": "Dropdowns, popovers and tooltips." },
+      { "name": "hover-lift", "value": "0 2px 8px rgba(15, 23, 42, 0.06)", "purpose": "Project and task cards on hover only." }
+    ],
+    "motion": [
+      { "name": "fast", "value": "0.12s", "purpose": "Hover and focus state changes." },
+      { "name": "mid", "value": "0.2s", "purpose": "Component-internal transitions." },
+      { "name": "slow", "value": "0.28s", "purpose": "Drawer and palette entry." },
+      { "name": "ease-standard", "value": "cubic-bezier(0.2, 0, 0, 1)", "purpose": "The single easing for authored motion." }
+    ],
+    "breakpoints": [
+      { "name": "wide", "value": "1360px" },
+      { "name": "rail", "value": "1023px" },
+      { "name": "mobile", "value": "768px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single dominant action on a surface.",
+      "html": "<button class=\"ds-btn-primary\">Review approvals</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 15px; border: 0; border-radius: 8px; background: #1677ff; color: #fff; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background-color 0.12s ease; } .ds-btn-primary:hover { background: #4096ff; } .ds-btn-primary:active { background: #0958d9; } .ds-btn-primary:focus-visible { outline: 2px solid #91caff; outline-offset: 2px; }"
+    },
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Secondary action that sits beside a primary action.",
+      "html": "<button class=\"ds-btn-default\">All projects</button>",
+      "css": ".ds-btn-default { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 15px; border: 1px solid #e6eaf0; border-radius: 8px; background: #fff; color: #0f172a; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: border-color 0.12s ease, color 0.12s ease; } .ds-btn-default:hover { border-color: #91caff; color: #1677ff; } .ds-btn-default:focus-visible { outline: 2px solid #91caff; outline-offset: 2px; }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A quiet search control with a readable placeholder.",
+      "html": "<label class=\"ds-search\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"7\" stroke=\"#64748b\" stroke-width=\"1.8\"/><path d=\"m16 16 4 4\" stroke=\"#64748b\" stroke-width=\"1.8\" stroke-linecap=\"round\"/></svg><input placeholder=\"Search people, titles…\" aria-label=\"Search people\" /></label>",
+      "css": ".ds-search { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 11px; border: 1px solid #e6eaf0; border-radius: 8px; background: #fff; box-sizing: border-box; } .ds-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #0f172a; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 14px; } .ds-search input::placeholder { color: #64748b; opacity: 1; } .ds-search:focus-within { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.12); }"
+    },
+    {
+      "name": "Working Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The default container: white, hairline border, no resting shadow.",
+      "html": "<section class=\"ds-card\"><header><h2>Next deadlines</h2><a href=\"#\">All tasks</a></header><p>Nothing dated in the next 7 days.</p></section>",
+      "css": ".ds-card { box-sizing: border-box; padding: 0; border: 1px solid #e6eaf0; border-radius: 12px; background: #fff; color: #0f172a; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; } .ds-card header { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 20px; border-bottom: 1px solid #eef2f7; } .ds-card h2 { margin: 0; font-size: 13.5px; font-weight: 600; } .ds-card a { color: #1677ff; font-size: 12px; font-weight: 500; text-decoration: none; } .ds-card p { margin: 0; padding: 20px; color: #64748b; font-size: 12px; }"
+    },
+    {
+      "name": "Status Tag",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "Semantic status with a written label, never colour alone.",
+      "html": "<span class=\"ds-tag ds-tag-warning\">At risk</span>",
+      "css": ".ds-tag { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; border-radius: 6px; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 500; line-height: 1; } .ds-tag-warning { background: #fffbeb; color: #b45309; }"
+    },
+    {
+      "name": "Selected Navigation Item",
+      "kind": "nav",
+      "refersTo": "nav-item-selected",
+      "description": "The current location in the deep-ink rail.",
+      "html": "<nav class=\"ds-rail\"><a class=\"ds-nav-item is-selected\" href=\"#\"><span class=\"ds-nav-dot\"></span>Overview</a><a class=\"ds-nav-item\" href=\"#\"><span class=\"ds-nav-dot\"></span>People</a></nav>",
+      "css": ".ds-rail { display: flex; flex-direction: column; gap: 2px; width: 216px; padding: 8px; border-radius: 10px; background: #0b1220; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; } .ds-nav-item { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px; border-radius: 7px; color: #9aa8bb; font-size: 13px; text-decoration: none; } .ds-nav-item:hover { background: rgba(148, 163, 184, 0.09); color: #fff; } .ds-nav-item.is-selected { background: rgba(22, 119, 255, 0.18); color: #fff; } .ds-nav-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.6; } .ds-nav-item.is-selected .ds-nav-dot { opacity: 1; background: #1677ff; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Signal Desk",
+    "overview": "TEAMFORGE is a working desk, not a showcase. The surface is built so an operations lead can read the organization's pulse, find the one thing that needs a human, and act without decoding a new interface. Familiar Ant Design patterns carry the interaction; the identity comes from restraint, a deep ink navigation rail, and a single azure signal that marks action and current position.",
+    "keyCharacteristics": [
+      "Ant Design v6 as the component language, themed through tokens rather than overridden CSS.",
+      "A 248px deep-ink navigation rail against a light three-layer surface model.",
+      "Azure #1677FF as the only action/selection accent; semantic colours only for state.",
+      "Flat-by-default surfaces with 1px hairline borders; shadows reserved for floating layers.",
+      "A functional ⌘K command palette as the signature interaction."
+    ],
+    "rules": [
+      { "name": "The One Azure Rule", "body": "Azure is spent on action, current selection, and data focus only. It is never a decorative background, a chart series by default, or a second brand colour.", "section": "colors" },
+      { "name": "The Text Plus Colour Rule", "body": "Status is never encoded by colour alone. Every health, priority, and approval state carries a written label beside its tint.", "section": "colors" },
+      { "name": "The Tabular Numbers Rule", "body": "Counts and metrics use tabular numerals so columns and metric bands never shift as values change.", "section": "typography" },
+      { "name": "The No-Costume Mono Rule", "body": "Monospace is for code, identifiers, and measured data. It never stands in for technical styling on labels or buttons.", "section": "typography" },
+      { "name": "The Hairline Rule", "body": "If a surface is not floating, it earns a 1px border instead of a shadow. A zero-offset coloured halo is never depth.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Ant Design components and theme tokens; change the system through ConfigProvider, not one-off CSS.",
+      "Do keep azure for action, current selection, and focus only.",
+      "Do put a written label beside every status colour.",
+      "Do use 4px-grid spacing: 8/16/20/24/32.",
+      "Do show loading, empty, error, hover, focus, and disabled states.",
+      "Do keep table rows and custom clickable surfaces keyboard-focusable.",
+      "Do use monospace only for IDs, predicates, room names, and measured data."
+    ],
+    "donts": [
+      "Don't introduce a second accent colour or a decorative gradient.",
+      "Don't add shadows to resting cards; use hairlines and tonal layers.",
+      "Don't use a hero-metric template or a grid of identical icon cards as page structure.",
+      "Don't use coloured left borders above 1px on cards, alerts, or list items.",
+      "Don't encode health or priority with colour alone.",
+      "Don't set body or placeholder text below 4.5:1 contrast.",
+      "Don't hide the primary action behind a modal when an inline form will do.",
+      "Don't invent activity, metrics, or agent claims to fill an empty state."
+    ]
+  }
+}

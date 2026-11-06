@@ -74,6 +74,32 @@ textarea.ant-input::placeholder,
   opacity: 1;
 }
 
+/* Ant preset tags default to low-contrast state text. Keep the semantic tint, darken the label. */
+.ant-tag.ant-tag-success {
+  color: #166534 !important;
+  background: #e8f6ed !important;
+}
+
+.ant-tag.ant-tag-warning {
+  color: #92400e !important;
+  background: #fef3c7 !important;
+}
+
+.ant-tag.ant-tag-error {
+  color: #991b1b !important;
+  background: #fee2e2 !important;
+}
+
+.ant-tag.ant-tag-blue {
+  color: #0958d9 !important;
+  background: #e6f4ff !important;
+}
+
+.ant-tag.ant-tag-default {
+  color: #475569 !important;
+  background: #f1f5f9 !important;
+}
+
 /* ── Shell ─────────────────────────────────────────────────────────────── */
 
 .app-shell.ant-layout {
@@ -826,6 +852,13 @@ a.attention-item:hover .attention-title {
   margin: 0;
 }
 
+.ant-table-placeholder .ant-table-cell,
+.ant-list-empty-text,
+.ant-empty-description,
+.ant-select-selection-placeholder {
+  color: var(--tf-ink-3) !important;
+}
+
 .empty-title {
   margin: 10px 0 0;
   font-size: 13.5px;
@@ -1300,17 +1333,6 @@ a.attention-item:hover .attention-title {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-}
-
-.agent-avatar {
-  display: flex;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  font-size: 18px;
 }
 
 .agent-copy {
