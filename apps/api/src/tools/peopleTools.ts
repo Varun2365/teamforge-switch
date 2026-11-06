@@ -3,10 +3,56 @@ import type { ToolRegistry } from './registry.js';
 import { UserModel, EmployeeProfileModel, SkillModel, EmployeeSkillModel } from '../db/models/org.js';
 import { normalizeName } from '@teamforge/shared';
 import { logAudit } from '../services/audit.js';
-import { ensurePersonEntity, createFact } from '../services/memoryService.js';
+import { ensurePersonEntity, createFact, upsertAlias } from '../services/memoryService.js';
 import { recordSource } from '../services/sourceService.js';
 
 export function registerPeopleTools(reg: ToolRegistry) {
+  reg.register({
+    name: 'create_person',
+    description: 'Add a teammate to the organization (creates their user record, profile, person entity, alias and optional skills). Use this whenever someone introduces a team member. Safe to call repeatedly: matches by name.',
+    tier: 'write',
+    input: z.object({
+      name: z.string().min(2),
+      role: z.enum(['owner', 'administrator', 'manager', 'team_lead', 'employee', 'external']).default('employee'),
+      title: z.string().optional(),
+      skills: z.array(z.string()).default([]),
+      evidence: z.string().optional(),
+    }),
+    handler: async ({ orgId, actor }, input) => {
+      const normalized = normalizeName(input.name);
+      let user = await UserModel.findOne({ orgId, normalizedName: normalized });
+      if (!user) {
+        user = await UserModel.create({ orgId, name: input.name.trim(), normalizedName: normalized, role: input.role, status: 'active', metadata: { createdBy: actor.name } });
+      } else if (input.role !== 'employee' || input.title) {
+        await UserModel.updateOne({ orgId, _id: user._id }, { $set: { role: input.role } });
+      }
+      if (input.title) {
+        await EmployeeProfileModel.updateOne({ orgId, userId: user._id }, { $set: { title: input.title }, $setOnInsert: { orgId, userId: user._id, joinedAt: new Date() } }, { upsert: true });
+      } else {
+        await EmployeeProfileModel.updateOne({ orgId, userId: user._id }, { $setOnInsert: { orgId, userId: user._id, joinedAt: new Date() } }, { upsert: true });
+      }
+      let sourceId: string | undefined;
+      if (input.evidence) {
+        const src = await recordSource({ orgId, type: 'manual', ref: `person:${user._id}`, authorName: actor.name, excerpt: input.evidence });
+        sourceId = String(src._id);
+      }
+      const entity = await ensurePersonEntity(orgId, String(user._id), user.name, sourceId ?? null, actor.name);
+      await upsertAlias(orgId, user.name, entity._id, 'person', sourceId ?? null, 0.99);
+      for (const skill of input.skills) {
+        const key = normalizeName(skill);
+        if (!key) continue;
+        const skillDoc = await SkillModel.findOneAndUpdate(
+          { orgId, normalizedName: key },
+          { $setOnInsert: { orgId, name: skill.trim(), normalizedName: key, category: 'general' } },
+          { upsert: true, new: true },
+        );
+        await EmployeeSkillModel.updateOne({ orgId, userId: user._id, skillId: skillDoc._id }, { $set: { level: 3, confirmedBy: 'self' } }, { upsert: true });
+      }
+      await logAudit(orgId, actor, 'person.created', { type: 'user', id: String(user._id) }, { name: user.name, role: input.role });
+      return { userId: String(user._id), name: user.name, role: input.role, title: input.title ?? null, skills: input.skills };
+    },
+  });
+
   reg.register({
     name: 'update_person',
     description: 'Update a teammate\'s org profile: role (owner/administrator/manager/team_lead/employee/external), title, manager, location, or their TeamForge display name. Use role facts for seniority changes too.',

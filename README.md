@@ -19,7 +19,7 @@ TEAMFORGE is the AI operations desk for a team: it understands the organization,
 | Business engine: ~53 tools over MCP `/mcp` + REST, MongoDB `teamforge-ops` (isolated DB) | ✅ |
 | Organizational memory: temporal facts, supersession, aliases, provenance, approvals | ✅ |
 | Persistent scheduler: reminders (@mentions the person in the room), morning brief, overdue scans, deadline/commitment follow-ups | ✅ verified live |
-| Dashboard (9 pages) | ✅ |
+| Dashboard (10 pages) | ✅ |
 
 ## Architecture
 

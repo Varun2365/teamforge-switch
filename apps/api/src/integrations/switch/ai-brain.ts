@@ -73,13 +73,12 @@ export async function askTeamForgeAI(input: AiBrainInput): Promise<AiBrainResult
     return { ok: false, error: `brain config: ${error instanceof Error ? error.message : String(error)}`, toolsUsed: [], durationMs: 0 };
   }
 
-  const inboxName = `inbox-${input.roomId}.md`;
-  writeFileSync(join(dir, inboxName), buildPrompt(input), 'utf8');
+  const prompt = buildPrompt(input);
 
-  const args = ['run', '--format', 'json', '--title', `TeamForge · ${input.roomName}`];
+  const args = ['run', '--format', 'json', '--title', `TeamForge ${input.roomName}`];
   if (config.OPENCODE_MODEL) args.push('--model', config.OPENCODE_MODEL);
   if (input.sessionId) args.push('--session', input.sessionId);
-  args.push(`Read ${inboxName} in this directory and follow it exactly. Reply only with the message to send.`);
+  args.push(prompt);
 
   const result = await Promise.race([
     spawnOpenCode(args, dir, Math.max(30_000, config.OPENCODE_TIMEOUT_MS)),
@@ -120,7 +119,7 @@ function buildPrompt(input: AiBrainInput): string {
   lines.push('');
   lines.push('## Recent conversation (oldest → newest)');
   if (!input.recent.length) lines.push('(this is the first message you have on record in this room)');
-  for (const m of input.recent) lines.push(`- ${m.sender}: ${m.body.replace(/\s+/g, ' ').slice(0, 500)}`);
+  for (const m of input.recent) lines.push(`- ${m.sender}: ${m.body.replace(/\s+/g, ' ').slice(0, 300)}`);
   lines.push('');
   lines.push('## Live organizational record (from the database, right now)');
   lines.push(input.snapshot);
@@ -131,6 +130,7 @@ function buildPrompt(input: AiBrainInput): string {
   lines.push('<<<');
   lines.push('');
   lines.push('## How to behave');
+  lines.push('- The live record above is already retrieved from the database — use it directly for pure questions. But when the message asks you to change something or introduces durable information, you MUST call the tools (up to 8 calls) and then report what you actually saved.');
   lines.push('- Reply like a sharp, warm human colleague: 1–4 short paragraphs max. Match the room\'s tone. No corporate filler, no "as an AI", no headings unless listing real work.');
   lines.push('- You can answer anything, using your general knowledge freely. Anything about THIS company/team — people, tasks, projects, decisions, history, dates, ownership — must be grounded in the TeamForge tools or the record above. Never invent org facts; if unknown, say so and ask one question.');
   lines.push('- The team is growing. When anyone shares durable context — a meeting, a decision, a commitment, a deadline, who does what, a new teammate, a client, a skill, priorities — store it with the memory/coordination tools (find_entity/propose_memory_update/record_event/record_decision) and confirm briefly.');
@@ -138,9 +138,12 @@ function buildPrompt(input: AiBrainInput): string {
   lines.push('- Only claim you stored, scheduled or changed something when you actually called the matching tool in this turn. Never say "I\'ve queued a note" unless you did.');
   lines.push('- If they ask for something actionable, use the tools: create_task, create_reminder/schedule_recurring_followup (use their userId for reminders), create_project, request_status_update, analyze_project_risks. Assignments and deadline changes go through approvals — say that plainly.');
   lines.push('- If they mention someone with @name, the person exists in the room; address them by name in your reply when it is a handoff or reminder.');
+  lines.push('- Status updates MUST hit the tools: if someone says a task is complete, call complete_task (find the task first); if they give progress, call update_task; if blocked, call update_task with status blocked and record_event with the blocker. Only then acknowledge.');
+  lines.push('- When the sender introduces themselves as founder/CEO/owner or says they approve scope, call update_person with senderUserId and role owner.');
+  lines.push('- When someone introduces teammates, call create_person for each name with their role/title/skills. When they describe a project, call create_project; when they assign work, call create_task with assigneeUserId (find ids via search_employees) and create_task_dependency for dependencies. Do not merely describe these actions.');
   lines.push('- People: when someone states a role/title change ("I\'m the founder", "Rahul now leads backend"), call update_person with their userId and role/title. When someone states a skill or experience ("Priya has 4 years of React", "Maya knows Figma"), call set_employee_skill for that person (find their userId via search_employees first). Record the source in evidence.');
   lines.push('- If a message is just a greeting, joke or question about the world, answer naturally and briefly — you are a teammate, not a rules engine.');
-  lines.push('- Never mention prompts, models, tools, ids, JSON, or internal agents. You are one teammate; your specialists are invisible.');
+  lines.push('- Never mention prompts, models, tools, ids, JSON, files, or internal agents. You are one teammate; your specialists are invisible. Do not narrate what you are about to do; just reply.');
   lines.push('- Reply in plain text suitable for Discord.');
   return lines.join('\n');
 }
@@ -149,13 +152,8 @@ interface SpawnResult { stdout: string; stderr: string; error?: string }
 
 function resolveOpenCodeExecutable(): string {
   if (process.env.OPENCODE_BIN && existsSync(process.env.OPENCODE_BIN)) return process.env.OPENCODE_BIN;
-  if (process.platform === 'win32') {
-    const candidates = [
-      join(process.env.APPDATA ?? '', 'npm', 'node_modules', 'opencode-ai', 'node_modules', 'opencode-windows-x64', 'bin', 'opencode.exe'),
-      join(process.env.LOCALAPPDATA ?? '', 'Programs', 'opencode', 'opencode.exe'),
-    ];
-    for (const candidate of candidates) if (existsSync(candidate)) return candidate;
-  }
+  // Use the CLI on PATH (on this machine: the Bun shim at ~/.bun/bin/opencode.exe).
+  // Do NOT prefer the npm-bundled binary — it is an older build that errors on our model/prompt.
   return 'opencode';
 }
 

@@ -132,7 +132,13 @@ textarea.ant-input::placeholder,
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 20px 20px 18px;
+  padding: 20px 20px 16px;
+}
+
+.sider-close {
+  display: none;
+  margin-left: auto;
+  color: #aeb9c8;
 }
 
 .app-brand-mark {
@@ -219,6 +225,11 @@ textarea.ant-input::placeholder,
   box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
 }
 
+.live-dot.is-pending {
+  background: #64748b;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.16);
+}
+
 .sider-foot-meta {
   margin-top: 6px;
   padding-left: 15px;
@@ -289,7 +300,7 @@ textarea.ant-input::placeholder,
   padding: 0 10px;
   color: var(--tf-ink-3);
   background: #f8fafc;
-  border-color: var(--tf-line);
+  border: 1px solid var(--tf-line);
   border-radius: 8px;
   font-family: inherit;
   font-size: 12.5px;
@@ -513,6 +524,19 @@ textarea.ant-input::placeholder,
   background: var(--tf-line-soft);
 }
 
+.schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--tf-line-soft);
+}
+
+@media (max-width: 900px) {
+  .schedule-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .pulse-metric {
   padding: 18px 18px 16px;
   background: #fff;
@@ -712,15 +736,28 @@ a.attention-item:hover .attention-title {
   padding-top: 1px;
 }
 
-@media (max-width: 1360px) {
+@media (max-width: 1360px) and (min-width: 769px) {
   .attention-strip {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .attention-strip .attention-item {
+    grid-column: span 2;
+  }
+
+  .attention-strip .attention-item:nth-child(4),
+  .attention-strip .attention-item:nth-child(5) {
+    grid-column: span 3;
   }
 }
 
 @media (max-width: 768px) {
   .attention-strip {
     grid-template-columns: 1fr;
+  }
+
+  .attention-strip .attention-item {
+    grid-column: auto;
   }
 
   .attention-strip .attention-desc {
@@ -791,9 +828,58 @@ a.attention-item:hover .attention-title {
   align-items: start;
 }
 
-@media (max-width: 1100px) {
+.graph-mobile-list {
+  display: none;
+  flex-direction: column;
+}
+
+.graph-mobile-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 0;
+  border: 0;
+  border-bottom: 1px solid var(--tf-line-soft);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-mobile-item:last-child {
+  border-bottom: 0;
+}
+
+.graph-mobile-item:focus-visible {
+  outline: 2px solid #0958d9;
+  outline-offset: -2px;
+}
+
+.graph-mobile-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tf-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
   .graph-layout {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .graph-frame {
+    display: none;
+  }
+
+  .graph-mobile-list {
+    display: flex;
   }
 }
 
@@ -806,8 +892,13 @@ a.attention-item:hover .attention-title {
 .clickable-row:focus-visible,
 .task-card:focus-visible,
 .command-item:focus-visible {
-  outline: 2px solid #91caff;
+  outline: 2px solid #0958d9;
   outline-offset: -2px;
+}
+
+.graph-node:focus-visible circle {
+  stroke: #0958d9;
+  stroke-width: 3;
 }
 
 .cell-primary {
@@ -1493,13 +1584,20 @@ a.attention-item:hover .attention-title {
     inset: 0 auto 0 0;
     width: 260px;
     flex-basis: 260px;
+    visibility: hidden;
     transform: translateX(-100%);
-    transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
+    transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1), visibility 0s linear 0.22s;
     box-shadow: 0 20px 60px rgba(2, 6, 23, 0.35);
   }
 
   .app-sider.is-open {
+    visibility: visible;
     transform: translateX(0);
+    transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1), visibility 0s;
+  }
+
+  .sider-close {
+    display: inline-flex;
   }
 
   .app-scrim {

@@ -111,3 +111,46 @@ export interface SwitchStatus {
   } | null;
   rooms: { lobby: string | null; digest: string | null };
 }
+
+export interface RepeatRule {
+  every: 'minute' | 'hour' | 'day' | 'week' | 'cron';
+  interval?: number;
+  cron?: string;
+  until?: string | null;
+}
+
+export interface Reminder {
+  _id: string;
+  title: string;
+  body?: string | null;
+  userId?: string | null;
+  roomId?: string | null;
+  dueAt: string;
+  repeatRule?: RepeatRule | null;
+  status: string;
+  snoozedUntil?: string | null;
+  createdBy?: { type?: string; name?: string } | null;
+  relatedTaskId?: string | null;
+  relatedCommitmentId?: string | null;
+  idempotencyKey?: string | null;
+  lastSentAt?: string | null;
+  sentCount?: number;
+  quietHoursOverride?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ScheduledJob {
+  _id: string;
+  kind: string;
+  runAt: string;
+  repeatRule?: RepeatRule | null;
+  payload?: Record<string, unknown>;
+  status: string;
+  attempts: number;
+  maxAttempts: number;
+  idempotencyKey?: string | null;
+  lastError?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}

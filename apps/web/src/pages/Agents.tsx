@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Avatar, Badge, Card, Col, Row, Select, Skeleton, Space, Tag } from 'antd';
+import { Avatar, Badge, Card, Col, Row, Select, Skeleton, Space, Tag, Tooltip } from 'antd';
 import { FilterOutlined, RobotOutlined } from '@ant-design/icons';
 import { useAgentActions, useSwitchStatus } from '../lib/hooks';
 import {
@@ -9,6 +9,7 @@ import {
   PageHeader,
   Panel,
   formatDateTime,
+  summarizeActivity,
   timeAgo,
 } from '../components/ui';
 
@@ -27,6 +28,7 @@ export default function AgentsPage() {
   const switchStatus = useSwitchStatus();
 
   const live = switchStatus.data?.server === 'reachable';
+  const switchLoading = switchStatus.isLoading;
   const runtime = switchStatus.data?.runtime;
   const liveAgents = new Map((runtime?.agents ?? []).map((agent) => [agent.key.replace('agent:', ''), agent]));
 
@@ -54,17 +56,17 @@ export default function AgentsPage() {
       <div className="section-stack">
         <Card className="tf-card" styles={{ body: { padding: '14px 18px' } }}>
           <div className="runtime-strip">
-            <span className={`live-dot${runtime?.running ? '' : ' is-off'}`} />
+            <span className={`live-dot${switchLoading ? ' is-pending' : runtime?.running ? '' : ' is-off'}`} />
             <strong style={{ fontSize: 13 }}>Switch runtime</strong>
             <Tag
-              color={runtime?.onlineAgents ? 'success' : 'warning'}
+              color={switchLoading ? 'default' : runtime?.onlineAgents ? 'success' : 'warning'}
               variant="filled"
               style={{ marginInlineEnd: 0 }}
             >
-              {runtime ? `${runtime.onlineAgents}/${runtime.agents.length} online` : 'Not reporting'}
+              {switchLoading ? 'Checking…' : runtime ? `${runtime.onlineAgents}/${runtime.agents.length} online` : 'Not reporting'}
             </Tag>
             <span className="cell-secondary">
-              Room <span className="mono">{runtime?.roomName ?? 'not provisioned'}</span>
+              Room <span className="mono">{switchLoading ? 'checking…' : runtime?.roomName ?? 'not provisioned'}</span>
             </span>
             {runtime?.roomId && (
               <span className="cell-secondary">
@@ -144,7 +146,11 @@ export default function AgentsPage() {
                   <span className="activity-agent">{action.agent.replace('agent:', '')}</span>
                   <div className="activity-copy">
                     <span className="activity-action">{action.action}</span>
-                    <p className="activity-summary">{action.outputSummary ?? action.error ?? '—'}</p>
+                    <Tooltip title={action.outputSummary ?? action.error}>
+                      <p className="activity-summary">
+                        {summarizeActivity(action.action, action.outputSummary, action.error)}
+                      </p>
+                    </Tooltip>
                     {action.roomId && <div className="cell-secondary mono">room {action.roomId}</div>}
                   </div>
                   <div className="activity-side">

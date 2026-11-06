@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Alert, Button, Card, Col, List, Row, Skeleton, Space, Table, Tag, Timeline } from 'antd';
+import { Alert, Button, Card, Col, List, Row, Skeleton, Space, Table, Tag, Timeline, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   ArrowRightOutlined,
@@ -12,18 +12,21 @@ import {
   TeamOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
-import { useOverview, useSwitchStatus } from '../lib/hooks';
+import { useOverview, useReminders, useScheduledJobs, useSwitchStatus } from '../lib/hooks';
 import type { Overview } from '../lib/api';
+import { jobLabel, timeUntil } from '../lib/schedule';
 import {
   Chip,
   ErrorBox,
   PageHeader,
   Panel,
   formatDate,
+  formatDateTime,
   formatLongDate,
   healthChip,
   priorityChip,
   statusChip,
+  summarizeActivity,
   timeAgo,
 } from '../components/ui';
 
@@ -97,7 +100,9 @@ function OverviewSkeleton() {
 export default function OverviewPage() {
   const navigate = useNavigate();
   const { data, isLoading, isError, error, refetch } = useOverview();
-  const { data: sw } = useSwitchStatus();
+  const { data: sw, isLoading: switchLoading } = useSwitchStatus();
+  const reminders = useReminders();
+  const jobs = useScheduledJobs();
 
   const live = sw?.server === 'reachable';
   const online = sw?.runtime?.onlineAgents ?? 0;
@@ -109,8 +114,12 @@ export default function OverviewPage() {
       description={`The live state of the organization — ${formatLongDate()}. Every number below is grounded in tool data.`}
       extra={
         <Space size={8} wrap>
-          <Tag color={live ? 'success' : 'warning'} variant="filled" style={{ marginInlineEnd: 0 }}>
-            {live ? `Switch live · ${online}/${total} agents` : 'Switch unreachable'}
+          <Tag
+            color={switchLoading ? 'default' : live ? 'success' : 'warning'}
+            variant="filled"
+            style={{ marginInlineEnd: 0 }}
+          >
+            {switchLoading ? 'Checking Switch…' : live ? `Switch live · ${online}/${total} agents` : 'Switch unreachable'}
           </Tag>
           {data && data.pendingApprovals > 0 && (
             <Link to="/approvals">
@@ -144,6 +153,34 @@ export default function OverviewPage() {
 
   const atRisk = data.projects.filter((project) => project.health !== 'on_track');
   const projectNames = atRisk.slice(0, 3).map((project) => project.name).join(', ');
+
+  const scheduledUpcoming = [
+    ...(reminders.data ?? [])
+      .filter((reminder) => reminder.status === 'scheduled' || reminder.status === 'snoozed')
+      .map((reminder) => ({
+        key: `reminder-${reminder._id}`,
+        title: reminder.title,
+        kind: 'Reminder',
+        at: reminder.dueAt,
+      })),
+    ...(jobs.data ?? [])
+      .filter((job) => job.status === 'pending')
+      .map((job) => ({
+        key: `job-${job._id}`,
+        title: jobLabel(job.kind),
+        kind: 'Scheduler',
+        at: job.runAt,
+      })),
+  ]
+    .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+    .slice(0, 4);
+
+  const scheduleError = reminders.isError || jobs.isError;
+  const scheduleErrorMessage = reminders.error ?? jobs.error;
+  const retrySchedule = () => {
+    reminders.refetch();
+    jobs.refetch();
+  };
 
   const projectColumns: ColumnsType<Overview['projects'][number]> = [
     {
@@ -261,13 +298,15 @@ export default function OverviewPage() {
               tone={atRisk.length > 0 ? 'warning' : undefined}
               title={
                 atRisk.length > 0
-                  ? `${atRisk.length} project${atRisk.length === 1 ? '' : 's'} need attention`
-                  : 'Projects are on track'
+                  ? `${atRisk.length} project${atRisk.length === 1 ? '' : 's'} at risk`
+                  : 'Projects at risk'
               }
               description={
-                atRisk.length > 0
-                  ? projectNames + (atRisk.length > 3 ? ` +${atRisk.length - 3} more` : '')
-                  : 'Every active project is reporting on track.'
+                data.activeProjects === 0
+                  ? 'No active projects to assess.'
+                  : atRisk.length > 0
+                    ? projectNames + (atRisk.length > 3 ? ` +${atRisk.length - 3} more` : '')
+                    : 'Every active project is reporting on track.'
               }
               count={atRisk.length}
             />
@@ -300,8 +339,14 @@ export default function OverviewPage() {
               to="/agents"
               icon={<RobotOutlined />}
               title="Agent runtime"
-              description={live ? `${online} of ${total} agents connected to Switch.` : 'Switch is unreachable; agents are waiting.'}
-              count={live ? `${online}/${total}` : '—'}
+              description={
+                switchLoading
+                  ? 'Checking the Switch runtime…'
+                  : live
+                    ? `${online} of ${total} agents connected to Switch.`
+                    : 'Switch is unreachable; agents are waiting.'
+              }
+              count={switchLoading ? '—' : live ? `${online}/${total}` : '—'}
             />
           </div>
         </Panel>
@@ -428,9 +473,11 @@ export default function OverviewPage() {
                       <span className="activity-agent">{activity.agent.replace('agent:', '')}</span>
                       <div className="activity-copy">
                         <span className="activity-action">{activity.action.replace(/_/g, ' ')}</span>
-                        <p className="activity-summary">
-                          {activity.outputSummary ?? activity.error ?? 'No summary recorded.'}
-                        </p>
+                        <Tooltip title={activity.outputSummary ?? activity.error}>
+                          <p className="activity-summary">
+                            {summarizeActivity(activity.action, activity.outputSummary, activity.error)}
+                          </p>
+                        </Tooltip>
                       </div>
                       <div className="activity-side">
                         <span className="cell-secondary">{timeAgo(activity.at)}</span>
@@ -452,42 +499,89 @@ export default function OverviewPage() {
           </Col>
         </Row>
 
-        <Panel title="Proactive feed" action={<span className="panel-caption">Delivered by the scheduler</span>}>
-          {data.notifications.length > 0 ? (
-            <List
-              dataSource={data.notifications.slice(0, 6)}
-              split={false}
-              renderItem={(notification) => (
-                <List.Item style={{ padding: '11px 0' }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <Space size={6} style={{ marginBottom: 3 }}>
-                      <Tag
-                        color="blue"
-                        variant="filled"
-                        style={{ marginInlineEnd: 0, fontSize: 10.5, textTransform: 'uppercase' }}
-                      >
-                        {notification.kind}
-                      </Tag>
-                      {notification.demo && <Chip tone="neutral">demo</Chip>}
-                    </Space>
-                    <div className="cell-primary" style={{ fontWeight: 500, lineHeight: 1.5 }}>
-                      {notification.title ?? notification.body}
-                    </div>
-                    {notification.title && <div className="cell-secondary">{notification.body}</div>}
-                  </div>
-                  <span className="cell-secondary" style={{ whiteSpace: 'nowrap' }}>
-                    {timeAgo(notification.at)}
-                  </span>
-                </List.Item>
+        <Row gutter={[20, 20]}>
+          <Col xs={24} xl={15}>
+            <Panel title="Proactive feed" action={<span className="panel-caption">Delivered by the scheduler</span>}>
+              {data.notifications.length > 0 ? (
+                <List
+                  dataSource={data.notifications.slice(0, 6)}
+                  split={false}
+                  renderItem={(notification) => (
+                    <List.Item style={{ padding: '11px 0' }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <Space size={6} style={{ marginBottom: 3 }}>
+                          <Tag
+                            color="blue"
+                            variant="filled"
+                            style={{ marginInlineEnd: 0, fontSize: 10.5, textTransform: 'uppercase' }}
+                          >
+                            {notification.kind}
+                          </Tag>
+                          {notification.demo && <Chip tone="neutral">demo</Chip>}
+                        </Space>
+                        <div className="cell-primary" style={{ fontWeight: 500, lineHeight: 1.5 }}>
+                          {notification.title ?? notification.body}
+                        </div>
+                        {notification.title && <div className="cell-secondary">{notification.body}</div>}
+                      </div>
+                      <span className="cell-secondary" style={{ whiteSpace: 'nowrap' }}>
+                        {timeAgo(notification.at)}
+                      </span>
+                    </List.Item>
+                  )}
+                />
+              ) : (
+                <div className="empty-state" style={{ padding: '24px 8px' }}>
+                  <p className="empty-title">Nothing proactive sent yet.</p>
+                  <p className="empty-hint">The scheduler fires at 08:30 in the organization's timezone.</p>
+                </div>
               )}
-            />
-          ) : (
-            <div className="empty-state" style={{ padding: '24px 8px' }}>
-              <p className="empty-title">Nothing proactive sent yet.</p>
-              <p className="empty-hint">The scheduler fires at 08:30 in the organization's timezone.</p>
-            </div>
-          )}
-        </Panel>
+            </Panel>
+          </Col>
+
+          <Col xs={24} xl={9}>
+            <Panel
+              className="fill"
+              title="Scheduled messages"
+              action={
+                <Link to="/scheduled" className="panel-link">
+                  View schedule <ArrowRightOutlined style={{ fontSize: 10 }} />
+                </Link>
+              }
+            >
+              {scheduleError ? (
+                <ErrorBox error={scheduleErrorMessage} onRetry={retrySchedule} />
+              ) : reminders.isLoading || jobs.isLoading ? (
+                <Skeleton active paragraph={{ rows: 4 }} />
+              ) : scheduledUpcoming.length === 0 ? (
+                <div className="empty-state" style={{ padding: '24px 8px' }}>
+                  <p className="empty-title">Nothing queued.</p>
+                  <p className="empty-hint">Reminders and recurring proactive jobs will appear here before they fire.</p>
+                </div>
+              ) : (
+                <List
+                  dataSource={scheduledUpcoming}
+                  split={false}
+                  renderItem={(item, index) => (
+                    <List.Item style={{ padding: '9px 0', borderBottom: index === scheduledUpcoming.length - 1 ? 'none' : '1px solid #eef2f7' }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="cell-primary" style={{ fontWeight: 500, lineHeight: 1.45 }}>
+                          {item.title}
+                        </div>
+                        <div className="cell-secondary">
+                          {item.kind} · {formatDateTime(item.at)}
+                        </div>
+                      </div>
+                      <span className="cell-secondary" style={{ whiteSpace: 'nowrap' }}>
+                        {timeUntil(item.at)}
+                      </span>
+                    </List.Item>
+                  )}
+                />
+              )}
+            </Panel>
+          </Col>
+        </Row>
       </div>
     </>
   );

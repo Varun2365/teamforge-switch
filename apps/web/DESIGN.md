@@ -31,7 +31,6 @@ colors:
   live-green: "#22c55e"
   live-halo: "rgba(34, 197, 94, 0.12)"
   hover-border: "#bcd6ff"
-  focus-ring: "#91caff"
   danger-soft: "#fef2f2"
   warning-soft: "#fffbeb"
   categorical-cyan: "#13c2c2"

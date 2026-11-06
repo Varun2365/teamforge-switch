@@ -5,11 +5,11 @@ primary_target: "apps/web"
 related_targets: []
 ---
 
-# Dashboard shell and nine pages
+# Dashboard shell and ten pages
 
 ## Scope and visitor mode
 
-Operate. Replace the visual system for the entire `apps/web` dashboard: the application shell and all nine routes (Overview, People, Org Graph, Projects, Tasks, Memory, Approvals, Agents, Settings). Preserve every API call, query, mutation, route, and data shape.
+Operate. Replace the visual system for the entire `apps/web` dashboard: the application shell and all ten routes (Overview, People, Org Graph, Projects, Tasks, Scheduled, Memory, Approvals, Agents, Settings). Preserve every API call, query, mutation, route, and data shape.
 
 ## Audience, job and success
 

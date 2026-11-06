@@ -88,7 +88,9 @@ export default function SettingsPage() {
                 {
                   key: 'status',
                   label: 'Status',
-                  children: sw.data?.live ? (
+                  children: sw.isLoading ? (
+                    <Chip tone="neutral">Checking…</Chip>
+                  ) : sw.data?.live ? (
                     <Chip tone="ok">Live</Chip>
                   ) : live ? (
                     <Chip tone="warn">Reachable · runtime offline</Chip>

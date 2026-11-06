@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import {
   Chip,
   Drawer,
+  Empty,
   ErrorBox,
   PageHeader,
   Panel,
@@ -135,13 +136,19 @@ export default function GraphPage() {
 
       <div className="section-stack">
         <div className="graph-layout">
-          <Panel title="Organization map" action={<span className="panel-caption">Deterministic layout</span>}>
+          <Panel title="Organization map" action={<span className="panel-caption">Select to inspect</span>}>
             {isLoading ? (
               <Skeleton active paragraph={{ rows: 12 }} />
             ) : isError ? (
               <ErrorBox error={error} onRetry={() => refetch()} />
+            ) : !data || data.nodes.length === 0 ? (
+              <Empty
+                title="No entities mapped yet."
+                hint="People, projects and decisions appear here once the organization records them in memory."
+              />
             ) : (
-              <div className="graph-frame">
+              <>
+                <div className="graph-frame">
                 <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Organization relationship graph">
                   <rect x="0" y="0" width={width} height={height} fill="#fbfcfe" rx="10" />
                   {[0.075, 0.17, 0.3, 0.36, 0.42, 0.47].map((ratio, index) => (
@@ -220,7 +227,27 @@ export default function GraphPage() {
                     );
                   })}
                 </svg>
-              </div>
+                </div>
+                <div className="graph-mobile-list">
+                  {data.nodes.map((node) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      className="graph-mobile-item"
+                      onClick={() => setSelected(node)}
+                    >
+                      <span
+                        className="legend-dot"
+                        style={{ background: GROUP_COLOR[node.group] ?? '#64748b' }}
+                      />
+                      <span className="graph-mobile-label">{node.label}</span>
+                      <Tag variant="filled" style={{ marginInlineEnd: 0 }}>
+                        {node.type}
+                      </Tag>
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </Panel>
 

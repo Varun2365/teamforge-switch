@@ -91,6 +91,11 @@ const STATUS_TONE: Record<string, 'ok' | 'warn' | 'danger' | 'info' | 'neutral'>
   planning: 'neutral',
   todo: 'neutral',
   pending: 'warn',
+  scheduled: 'info',
+  sent: 'ok',
+  snoozed: 'warn',
+  running: 'info',
+  failed: 'danger',
   at_risk: 'warn',
   blocked: 'danger',
   off_track: 'danger',
@@ -221,4 +226,28 @@ export function timeAgo(d?: string | Date | null) {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   return days === 1 ? 'yesterday' : `${days}d ago`;
+}
+
+/** Turn raw tool-call payloads into a short human summary; keep the raw text for a tooltip. */
+export function summarizeActivity(action: string, summary?: string | null, error?: string | null) {
+  if (error) return error;
+  if (!summary) return 'No summary recorded.';
+  if (action !== 'tool_call') return summary;
+
+  const detail = /detail=([^·]+)/.exec(summary)?.[1]?.trim();
+  if (detail) return detail;
+
+  const name = /name=([^·]+)/.exec(summary)?.[1]?.trim();
+  const title = /title=([^·]+)/.exec(summary)?.[1]?.trim();
+  if (name) return title ? `${title} · ${name}` : name;
+
+  const status = /status=([^·]+)/.exec(summary)?.[1]?.trim();
+  const normalized = /normalized=([^·]+)/.exec(summary)?.[1]?.trim();
+  if (status) return normalized ? `${status.replace(/_/g, ' ')} · ${normalized}` : status.replace(/_/g, ' ');
+
+  const kind = /kind=([^·]+)/.exec(summary)?.[1]?.trim();
+  if (kind) return kind.replace(/_/g, ' ');
+
+  if (/^[\w-]+=/.test(summary)) return 'Tool call completed';
+  return summary;
 }

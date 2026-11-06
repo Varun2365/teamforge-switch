@@ -837,7 +837,7 @@ class SwitchRuntime {
     const conversation = await ConversationModel.findOne({ orgId: this.organizationId, roomId: input.roomId }).lean();
     const recentDocs = await MessageModel.find({ orgId: this.organizationId, roomId: input.roomId, switchMessageId: { $ne: input.switchMessageId } })
       .sort({ sentAt: -1 })
-      .limit(8)
+      .limit(5)
       .lean();
     const recent = recentDocs.reverse().map((m) => ({ sender: m.senderName ?? 'teammate', body: m.body, at: m.sentAt ?? (m as { createdAt?: Date }).createdAt ?? new Date() }));
     const snapshot = await this.buildSnapshot();
@@ -953,16 +953,18 @@ class SwitchRuntime {
 
   /** Every real teammate gets a record the first time they speak — name from their Discord identity. */
   private async resolveOrCreateSender(senderName: string, switchParticipantId: string, at: Date): Promise<{ _id: string; name: string; role: string } | null> {
+    if (this.knownAgentName(senderName)) return null;
     const name = senderName.trim() || 'Teammate';
     const value = normalizeName(name);
     if (!value) return null;
     let user = await UserModel.findOne({ orgId: this.organizationId, $or: [{ normalizedName: value }, ...(switchParticipantId ? [{ 'metadata.switchParticipantId': switchParticipantId }] : [])] });
     if (!user) {
+      const existingCount = await UserModel.countDocuments({ orgId: this.organizationId });
       user = await UserModel.create({
         orgId: this.organizationId,
         name,
         normalizedName: value,
-        role: 'employee',
+        role: existingCount === 0 ? 'owner' : 'employee',
         status: 'active',
         metadata: { switchParticipantId, firstSeenAt: at.toISOString() },
         lastSeenAt: at,

@@ -222,14 +222,14 @@ export default function MemoryPage() {
               </Panel>
             </Col>
           </Row>
-        ) : pendingCount === 0 ? (
+        ) : (
           <Panel>
             <Empty
               title="Search organizational memory"
               hint="Entities are people, teams, projects, decisions and clients, connected by sourced relationships. Type at least two characters to begin."
             />
           </Panel>
-        ) : null}
+        )}
       </div>
 
       {selectedEntity && (
@@ -284,7 +284,7 @@ export default function MemoryPage() {
                 <div
                   style={{
                     padding: 14,
-                    border: '1px solid #91caff',
+                    border: '1px solid #bcd6ff',
                     borderRadius: 10,
                     background: '#f0f7ff',
                   }}

@@ -32,10 +32,16 @@ export default function AppLayout() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const siderRef = useRef<HTMLElement>(null);
+  const navToggleRef = useRef<HTMLButtonElement>(null);
+  const navWasOpen = useRef(false);
   const [navOpen, setNavOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches,
+  );
 
-  const { data: switchStatus } = useSwitchStatus();
+  const { data: switchStatus, isLoading: switchLoading } = useSwitchStatus();
   const pending = useApprovalsPending();
   const org = useQuery({
     queryKey: ['org-current'],
@@ -51,6 +57,17 @@ export default function AppLayout() {
   const orgName = typeof org.data?.name === 'string' ? org.data.name : 'Workspace';
   const current = navEntryForPath(pathname);
   const selectedKey = activeNavPath(pathname);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1023px)');
+    const onChange = () => {
+      setIsMobile(media.matches);
+      if (!media.matches) setNavOpen(false);
+    };
+    onChange();
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
 
   useEffect(() => {
     setNavOpen(false);
@@ -72,6 +89,50 @@ export default function AppLayout() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  useEffect(() => {
+    if (!isMobile) return;
+
+    if (navOpen) {
+      navWasOpen.current = true;
+      const node = siderRef.current;
+      node?.querySelector<HTMLElement>('.ant-menu-item-selected, .ant-menu-item')?.focus();
+
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setNavOpen(false);
+          return;
+        }
+        if (event.key !== 'Tab' || !node) return;
+
+        const focusable = Array.from(
+          node.querySelectorAll<HTMLElement>('.ant-menu-item, a[href], button:not([disabled])'),
+        ).filter((element) => element.offsetParent !== null);
+        if (focusable.length === 0) return;
+
+        const first = focusable[0]!;
+        const last = focusable[focusable.length - 1]!;
+        const activeInside = node.contains(document.activeElement);
+
+        if (event.shiftKey && (!activeInside || document.activeElement === first)) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (!activeInside || document.activeElement === last)) {
+          event.preventDefault();
+          first.focus();
+        }
+      };
+
+      document.addEventListener('keydown', onKeyDown);
+      return () => document.removeEventListener('keydown', onKeyDown);
+    }
+
+    if (navWasOpen.current) {
+      navToggleRef.current?.focus();
+      navWasOpen.current = false;
+    }
+  }, [isMobile, navOpen]);
+
   const breadcrumbItems =
     pathname === '/'
       ? [{ title: 'Overview' }]
@@ -81,7 +142,13 @@ export default function AppLayout() {
     <Layout className="app-shell">
       {navOpen && <div className="app-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />}
 
-      <aside className={`app-sider${navOpen ? ' is-open' : ''}`} aria-label="Primary navigation">
+      <aside
+        id="app-sider"
+        ref={siderRef}
+        className={`app-sider${navOpen ? ' is-open' : ''}`}
+        aria-label="Primary navigation"
+        aria-hidden={isMobile && !navOpen ? true : undefined}
+      >
         <div className="app-brand">
           <div className="app-brand-mark" aria-hidden="true">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
@@ -93,6 +160,13 @@ export default function AppLayout() {
             <div className="app-brand-name">TEAMFORGE</div>
             <div className="app-brand-sub">Operations desk</div>
           </div>
+          <Button
+            className="sider-close"
+            type="text"
+            icon={<CloseOutlined />}
+            onClick={() => setNavOpen(false)}
+            aria-label="Close navigation"
+          />
         </div>
 
         <Menu
@@ -107,13 +181,17 @@ export default function AppLayout() {
           }}
         />
 
-        <div className="sider-foot">
+        <div className="sider-foot" aria-live="polite">
           <div className="sider-foot-row">
-            <span className={`live-dot${live ? '' : ' is-off'}`} />
-            <span>{live ? 'Switch live' : 'Switch unreachable'}</span>
+            <span className={`live-dot${switchLoading ? ' is-pending' : live ? '' : ' is-off'}`} />
+            <span>{switchLoading ? 'Checking Switch…' : live ? 'Switch live' : 'Switch unreachable'}</span>
           </div>
           <div className="sider-foot-meta">
-            {live ? `${online}/${total} agents · ${runtime?.roomName ?? 'room pending'}` : 'Waiting for the local server'}
+            {switchLoading
+              ? 'Contacting the local server'
+              : live
+                ? `${online}/${total} agents · ${runtime?.roomName ?? 'room pending'}`
+                : 'Waiting for the local server'}
           </div>
           <div className="sider-foot-note">No @mention needed — just say it in the room.</div>
         </div>
@@ -123,11 +201,14 @@ export default function AppLayout() {
         <Header className="app-header">
           <div className="header-left">
             <Button
+              ref={navToggleRef}
               className="nav-toggle"
               type="text"
               icon={navOpen ? <CloseOutlined /> : <MenuUnfoldOutlined />}
               onClick={() => setNavOpen((open) => !open)}
               aria-label={navOpen ? 'Close navigation' : 'Open navigation'}
+              aria-expanded={navOpen}
+              aria-controls="app-sider"
             />
             <div className="header-crumbs">
               <Breadcrumb items={breadcrumbItems} />

@@ -81,6 +81,11 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
           prefix={<SearchOutlined />}
           placeholder="Jump to a page or action…"
           aria-label="Search or jump to a page"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls="command-list"
+          aria-expanded={open}
+          aria-activedescendant={filtered[active] ? `command-item-${active}` : undefined}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={onKeyDown}
@@ -89,7 +94,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
         />
       </div>
 
-      <div className="command-list" role="listbox" aria-label="Dashboard navigation">
+      <div className="command-list" role="listbox" id="command-list" aria-label="Dashboard navigation">
         {filtered.length === 0 && <div className="command-empty">No page or action matches “{query}”.</div>}
         {filtered.map((item, index) => {
           const showGroup = index === 0 || filtered[index - 1]?.group !== item.group;

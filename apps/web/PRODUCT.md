@@ -24,7 +24,7 @@ The primary conversational surface is a Discord channel bridged to a Switch room
 
 ## Capabilities and Constraints
 
-Nine live pages: Overview, People, Org Graph, Projects, Tasks, Memory, Approvals, Agents, and Settings. Existing behavior includes task creation and completion, approval approve/reject, memory proposal approve/reject, and fact correction. All existing API calls, query keys, mutations, routes, and data shapes are product truth and must keep working. The dashboard is read-heavy; do not invent activity, claims, customers, or metrics. Agent activity and demo flags must remain honest. Stack: React 18, Vite, TypeScript, React Router, TanStack Query. The visual layer is being replaced with Ant Design; the API and backend are out of scope.
+Ten live pages: Overview, People, Org Graph, Projects, Tasks, Scheduled, Memory, Approvals, Agents, and Settings. Existing behavior includes task creation and completion, approval approve/reject, memory proposal approve/reject, and fact correction. The Scheduled page exposes the proactive pipeline: reminders and recurring scheduler jobs, including their next run, cadence, status, and delivery rules. All existing API calls, query keys, mutations, routes, and data shapes are product truth and must keep working. The dashboard is read-heavy; do not invent activity, claims, customers, or metrics. Agent activity and demo flags must remain honest. Stack: React 18, Vite, TypeScript, React Router, TanStack Query. The visual layer is being replaced with Ant Design; the API and backend are out of scope.
 
 ## Brand Commitments
 

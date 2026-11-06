@@ -9,6 +9,7 @@ import MemoryPage from './pages/Memory';
 import ApprovalsPage from './pages/Approvals';
 import AgentsPage from './pages/Agents';
 import SettingsPage from './pages/Settings';
+import ScheduledPage from './pages/Scheduled';
 
 export function AppRoutes() {
   return (
@@ -20,6 +21,7 @@ export function AppRoutes() {
         <Route path="/graph" element={<GraphPage />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/scheduled" element={<ScheduledPage />} />
         <Route path="/memory" element={<MemoryPage />} />
         <Route path="/approvals" element={<ApprovalsPage />} />
         <Route path="/agents" element={<AgentsPage />} />

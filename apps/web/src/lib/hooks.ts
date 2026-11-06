@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, type Overview, type Person, type PersonProfile, type Project, type Task, type Entity, type Approval, type AgentAction, type NotificationItem, type SwitchStatus } from './api';
+import { api, type Overview, type Person, type PersonProfile, type Project, type Task, type Entity, type Approval, type AgentAction, type NotificationItem, type SwitchStatus, type Reminder, type ScheduledJob } from './api';
 
 export const keys = {
   overview: ['overview'],
@@ -18,6 +18,7 @@ export const keys = {
   switchStatus: ['switch-status'],
   proposals: ['memory', 'proposals'],
   reminders: ['reminders'],
+  scheduledJobs: ['scheduled-jobs'],
 };
 
 export const useOverview = () => useQuery({ queryKey: keys.overview, queryFn: () => api<Overview>('/api/overview'), refetchInterval: 15000 });
@@ -40,6 +41,20 @@ export const useAgentActions = (agent?: string) => useQuery({ queryKey: [...keys
 export const useNotifications = () => useQuery({ queryKey: keys.notifications, queryFn: () => api<NotificationItem[]>('/api/notifications'), refetchInterval: 15000 });
 export const useSwitchStatus = () => useQuery({ queryKey: keys.switchStatus, queryFn: () => api<SwitchStatus>('/api/switch/status'), refetchInterval: 20000 });
 export const useMemoryProposals = (status = 'pending') => useQuery({ queryKey: [...keys.proposals, status], queryFn: () => api<Array<Record<string, unknown>>>(`/api/memory/proposals?status=${status}`) });
+
+export const useReminders = (status?: string) =>
+  useQuery({
+    queryKey: [...keys.reminders, status ?? 'all'],
+    queryFn: () => api<Reminder[]>(`/api/reminders${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+    refetchInterval: 15_000,
+  });
+
+export const useScheduledJobs = (status?: string) =>
+  useQuery({
+    queryKey: [...keys.scheduledJobs, status ?? 'all'],
+    queryFn: () => api<ScheduledJob[]>(`/api/scheduled-jobs${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+    refetchInterval: 15_000,
+  });
 
 export function useInvalidateAll() {
   const qc = useQueryClient();

@@ -1,0 +1,572 @@
+{
+  "generatedAt": "2026-11-06T13:15:16.817Z",
+  "results": [
+    {
+      "scenario": "0. Introduction",
+      "sender": "Sarah",
+      "body": "introduces the team",
+      "reply": "Good to meet you properly, Sarah — the whole team's on record now: you as owner/founder-CEO, Alex running delivery, Maya on UI/UX, Rahul backend, Priya frontend, Daniel marketing, Emma QA.\n\nOne correction to what I said earlier: Website Launch wasn't actually in the system yet, so I've set it up for Nov 13 and put the five workstreams in with owners. Designs and the auth API both block Priya's integration, and QA sits behind that — so Maya's designs on Sunday are the first thing that has to land.\n\nThe only blank is Daniel's campaign prep; no date came with it. When should that be done?",
+      "brain": "ai",
+      "tools": [
+        "search_employees",
+        "search_projects",
+        "update_person",
+        "create_person",
+        "create_task",
+        "create_project",
+        "update_task",
+        "create_task_dependency",
+        "record_event"
+      ],
+      "ms": 64022,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Sarah recorded as a person",
+          "pass": true,
+          "detail": "owner"
+        },
+        {
+          "label": "Team profiles created",
+          "pass": true,
+          "detail": "users=7"
+        },
+        {
+          "label": "Owner role persisted",
+          "pass": true,
+          "detail": "owner"
+        }
+      ]
+    },
+    {
+      "scenario": "0. Introduction",
+      "sender": "Sarah",
+      "body": "introduces project and tasks",
+      "reply": "That all lines up with what's already on the board, Sarah — Website Launch due Nov 13, with Maya on designs by the 8th, Rahul on the auth API by the 9th, Priya on frontend integration by the 11th, then Emma on QA and Daniel on campaign both by the 12th. Chain reads frontend → auth API, QA → frontend, launch → QA approval.\n\nOne thing I'd flag: Emma's QA and Daniel's campaign both land on the 12th, which leaves zero buffer before a Nov 13 launch. If QA finds anything, Daniel's already at the wire.\n\n@Maya, @Rahul, @Priya — the 8th, 9th and 11th are the dates that protect everyone downstream, so holler early if any of those slip.",
+      "brain": "ai",
+      "tools": [],
+      "ms": 21761,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Website Launch project stored",
+          "pass": true,
+          "detail": "due 2026-11-13"
+        },
+        {
+          "label": "At least 5 tasks stored",
+          "pass": true,
+          "detail": "tasks=5"
+        },
+        {
+          "label": "Tasks assigned",
+          "pass": true,
+          "detail": "assignments=5"
+        },
+        {
+          "label": "Dependencies stored",
+          "pass": true,
+          "detail": "deps=3"
+        }
+      ]
+    },
+    {
+      "scenario": "1. Natural conversation",
+      "sender": "Sarah",
+      "body": "launch next Friday",
+      "reply": "You're set, Sarah — Friday the 13th it is, and everything's already on the board: Maya's designs by the 8th, Rahul's auth API by the 9th, Priya's frontend integration by the 11th, then Emma's QA and Daniel's campaign both landing the 12th, which leaves you a clean day of buffer before launch.\n\nOne small gap worth closing: Daniel's launch campaign prep still has no due date on it, so it's the only piece that isn't time-anchored. Want me to lock it to the 12th alongside Emma's QA, or does the campaign need to wrap earlier so you can review the creative first?",
+      "brain": "ai",
+      "tools": [],
+      "ms": 8467,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Recognises Website Launch",
+          "pass": false,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "1. Natural conversation",
+      "sender": "Sarah",
+      "body": "who owns frontend",
+      "reply": "Priya's on frontend — she's building the integration, due Nov 11.",
+      "brain": "ai",
+      "tools": [],
+      "ms": 3620,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Names Priya as frontend owner",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "1. Natural conversation",
+      "sender": "Sarah",
+      "body": "Rahul assignments",
+      "reply": "Rahul's on the Authentication API — it's still in todo with a due date of Nov 9. That one feeds into Priya's frontend integration, so his piece needs to land before she can finish hers.",
+      "brain": "ai",
+      "tools": [],
+      "ms": 3625,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Mentions authentication/API task",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "2. Create & coordinate",
+      "sender": "Sarah",
+      "body": "create Mobile App Launch",
+      "reply": "Done, Sarah — Mobile App Launch is live on the board with a due date of Dec 1, and I've logged \"ship v1 by December 1\" as the project goal so we don't lose it.\n\nOne thing worth flagging: everyone's currently loaded with the Website Launch work landing Nov 13 — Maya, Rahul, Priya, Daniel and Emma all have something due that week. Who do you want leading the mobile app, and do you want me to hold the breakdown until the website ship is done?\n\nIf you give me the owner, I'll draft the task list and dependencies for your approval.",
+      "brain": "ai",
+      "tools": [
+        "create_project",
+        "record_decision"
+      ],
+      "ms": 43465,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Project persisted in DB",
+          "pass": true,
+          "detail": "mobile-app-launch"
+        },
+        {
+          "label": "Deadline stored",
+          "pass": true,
+          "detail": "2026-12-01"
+        }
+      ]
+    },
+    {
+      "scenario": "2. Create & coordinate",
+      "sender": "Sarah",
+      "body": "assign design + backend",
+      "reply": "Done, Sarah — both are on Mobile App Launch: **Mobile app UI design** for Maya, and **Mobile app backend development** for Rahul, both high priority and in todo.\n\nI left due dates off for now so we can set them against the Dec 1 release rather than guess. Want me to slot the UI design first and the backend about a week behind it?\n\nWorth keeping in mind: Maya, Rahul and the rest are still carrying Website Launch work until Nov 13, so real movement on these probably starts after that.",
+      "brain": "ai",
+      "tools": [
+        "search_projects",
+        "search_employees",
+        "create_task",
+        "get_task"
+      ],
+      "ms": 45834,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "New tasks created for Mobile App Launch",
+          "pass": true,
+          "detail": "tasks=2"
+        },
+        {
+          "label": "Tasks persisted with owners",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "2. Create & coordinate",
+      "sender": "Sarah",
+      "body": "dependency instruction",
+      "reply": "Locked that in: Priya's Frontend integration now depends on Rahul's Authentication API, so it can't start until his API is marked done — I also recorded it as a standing decision so it doesn't get forgotten. Their dates already line up (API Nov 9, integration Nov 11), so there's slack if he slips a day.\n\nOne gap: Mobile App Launch has backend development for Rahul and UI design for Maya, but no mobile frontend task yet. Want me to add one for Priya, gated on Rahul's mobile backend the same way?",
+      "brain": "ai",
+      "tools": [
+        "search_tasks",
+        "search_projects",
+        "create_task_dependency",
+        "record_decision",
+        "get_task_dependencies"
+      ],
+      "ms": 49536,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Dependency record exists",
+          "pass": true,
+          "detail": "deps=3"
+        }
+      ]
+    },
+    {
+      "scenario": "2. Create & coordinate",
+      "sender": "Sarah",
+      "body": "project plan",
+      "reply": "Here's where both projects stand, in order:\n\n**Website Launch — due Nov 13**\n- Website designs — Maya, Nov 8\n- Authentication API — Rahul, Nov 9\n- Frontend integration — Priya, Nov 11 (gated: can't start until Rahul's API is done)\n- QA pass — Emma, Nov 12\n- Launch campaign prep — Daniel (no date set yet)\n\n**Mobile App Launch — due Dec 1**\n- Mobile app UI design — Maya, no date yet\n- Mobile app backend development — Rahul, no date yet\n\nThe gap worth naming: nobody is on mobile until the website work lands Nov 13, so those two mobile tasks are undated and effectively parked behind it. Want me to slot Maya's UI design for the week after Nov 13 and push Rahul's mobile backend to start alongside it — or hold the mobile work until the site ships?",
+      "brain": "ai",
+      "tools": [],
+      "ms": 12105,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Reply includes tasks/owners",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "Uses real data (no invented tasks)",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "3. Memory",
+      "sender": "Sarah",
+      "body": "skills statement",
+      "reply": "Noted and saved, Sarah — Priya's on record for React (4 years), and Rahul for Node.js and PostgreSQL. Fits their current work nicely: she's on Frontend integration, he's on the Authentication API.\n\nI marked both at a senior level so skill lookups surface them first. Want me to record any other specialties while I'm at it — say Maya's design stack or Emma's QA tooling?",
+      "brain": "ai",
+      "tools": [
+        "search_employees",
+        "set_employee_skill"
+      ],
+      "ms": 61574,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Skills persisted",
+          "pass": true,
+          "detail": "skills=11"
+        }
+      ]
+    },
+    {
+      "scenario": "3. Memory",
+      "sender": "Sarah",
+      "body": "React query",
+      "reply": "Priya — she's got 4 years of React, and she's the one on Frontend integration right now. Rahul's Node.js and PostgreSQL, not React, so he's the API side of that handoff.",
+      "brain": "ai",
+      "tools": [],
+      "ms": 3632,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Returns Priya",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "3. Memory",
+      "sender": "Sarah",
+      "body": "PostgreSQL query",
+      "reply": "Rahul — he's the Node.js and PostgreSQL specialist, and he's currently on the Authentication API for the Website Launch.",
+      "brain": "ai",
+      "tools": [],
+      "ms": 6041,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Returns Rahul",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "3. Memory",
+      "sender": "Sarah",
+      "body": "unknown skill query",
+      "reply": "Not on record, no — Maya's our UI/UX designer, and she's on Website designs and the mobile app UI right now. If she does have React chops, tell me and I'll note it on her profile so it shows up in skill searches.",
+      "brain": "ai",
+      "tools": [],
+      "ms": 4824,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Does not invent React for Maya",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "3. Memory",
+      "sender": "Sarah",
+      "body": "Figma fact",
+      "reply": "Got it — Maya's Figma is on her profile now, so she'll show up in skill searches for it. Thanks, Sarah.",
+      "brain": "ai",
+      "tools": [
+        "search_employees",
+        "set_employee_skill",
+        "get_employee_skills"
+      ],
+      "ms": 31365,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Figma fact stored",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "3. Memory",
+      "sender": "Sarah",
+      "body": "Maya profile query",
+      "reply": "Maya's our UI/UX designer. She's got two open pieces right now: Website designs, due Nov 8, and Mobile app UI design for the App Launch. Figma's on her profile; React isn't — you mentioned it wasn't her area. Want me to put anything else on her record?",
+      "brain": "ai",
+      "tools": [],
+      "ms": 3627,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Mentions design role",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "Mentions Figma",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "4. Update memory",
+      "sender": "Sarah",
+      "body": "Rahul leadership",
+      "reply": "Done — Rahul's profile now shows him as Backend Lead (team lead), with the change logged. He's still carrying the mobile app backend work and the Authentication API due Nov 9, so Priya's frontend integration and Emma's QA stay gated behind him.\n\nWant me to formalize the backend team under him — say, who reports to him and which tasks roll up to his lead?",
+      "brain": "ai",
+      "tools": [
+        "search_employees",
+        "find_entity",
+        "update_person",
+        "record_event"
+      ],
+      "ms": 30219,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Role change persisted/acknowledged",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "4. Update memory",
+      "sender": "Sarah",
+      "body": "leads backend",
+      "reply": "Rahul's leading backend now — it's on his profile as Backend Lead, and he's still carrying the mobile app backend work plus the Authentication API due Nov 9.",
+      "brain": "ai",
+      "tools": [],
+      "ms": 2419,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Returns Rahul",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "4. Update memory",
+      "sender": "Sarah",
+      "body": "temporary coordinator",
+      "reply": "",
+      "brain": "n/a",
+      "tools": [],
+      "ms": null,
+      "status": "processing",
+      "checks": [
+        {
+          "label": "Temporary state acknowledged",
+          "pass": false,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "4. Update memory",
+      "sender": "Sarah",
+      "body": "who coordinates backend",
+      "reply": "Alex is coordinating backend right now — temporary cover until Rahul cycles back to his usual responsibilities.\n\nRahul's profile still shows Backend Lead, so there's a small mismatch. Want me to log Alex as interim backend coordinator alongside it, rather than changing Rahul's title?",
+      "brain": "ai",
+      "tools": [],
+      "ms": 12114,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Returns Alex",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "5. Task tracking",
+      "sender": "Rahul",
+      "body": "80% progress",
+      "reply": "Nice, that's ahead of the Nov 9 due date. Worth knowing that Priya's frontend integration is gated on that API, so landing it tomorrow keeps her clear for the 11th instead of eating into her window — want me to ping her when it's done?",
+      "brain": "ai",
+      "tools": [
+        "get_organization_overview"
+      ],
+      "ms": 20533,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Does not mark complete",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "5. Task tracking",
+      "sender": "Sarah",
+      "body": "launch status",
+      "reply": "Website Launch is active and due Nov 13 — nothing overdue or blocked right now, so on paper it's fine. The live pieces are Maya's website designs due the 8th, then a QA pass landing the 12th.\n\nThe tight part is the end: QA is the day before launch, and it sits behind frontend integration (11th) which is gated on Rahul's auth API (9th). He says he's finishing tomorrow, which keeps that clear — but one slip on the API eats straight into QA time.\n\nWant me to check in with Maya on where the designs actually stand?",
+      "brain": "ai",
+      "tools": [
+        "record_decision",
+        "record_event"
+      ],
+      "ms": 13273,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Grounded status",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "5. Task tracking",
+      "sender": "Rahul",
+      "body": "API complete",
+      "reply": "Nice work — that clears the gate on Priya's frontend integration, so the 11th looks safe now instead of tight.\n\nWant me to ping Priya that the API is ready, or let her pick it up on her own?",
+      "brain": "ai",
+      "tools": [],
+      "ms": 20542,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Completion acknowledged",
+          "pass": false,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "5. Task tracking",
+      "sender": "Sarah",
+      "body": "can frontend start",
+      "reply": "Yes — Rahul's auth API is done, and that was the only thing gating Priya's frontend integration (due the 11th). Nothing else is blocking her, so she can pick it up now. Want me to ping her, or will she grab it on her own?",
+      "brain": "ai",
+      "tools": [],
+      "ms": 22949,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Checks dependency correctly",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "6. Collaboration",
+      "sender": "Sarah",
+      "body": "competitor research",
+      "reply": "I don't have any competitor or market intel on record for Acme — and \"our industry\" is the one detail I can't guess without inventing three companies, which isn't useful to you. Give me the category (or the three names you're already watching) and I'll do a real teardown: their positioning, pricing story, and where the gap is.\n\nWhat I can say now: the Website Launch lands the 13th, so this has to settle in days. The usual fork is cheap-and-fast vs. specialist depth vs. integrated suite — the strong move is to pick one and let the other two be someone else's territory, because sites that hedge across all three convert badly.\n\nSay the word on the category and I'll come back with names and a concrete positioning line for the site.",
+      "brain": "ai",
+      "tools": [],
+      "ms": 13313,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Research-style answer with sources/assumptions",
+          "pass": true,
+          "detail": "research has no web tool"
+        }
+      ]
+    },
+    {
+      "scenario": "6. Collaboration",
+      "sender": "Sarah",
+      "body": "tasks from research",
+      "reply": "Careful — there are no recommendations to convert yet. My competitor note stopped at the one thing I couldn't guess: the category. I won't invent three companies and then build tasks on top of invented findings.\n\nName the category (or the three competitors you're already watching) and I'll write it up as real work: a teardown of their positioning, messaging and pricing for Daniel, a positioning call for you to sign off, and a website copy update for Maya — sequenced so the copy lands before the design freeze on the 8th.\n\nOne thing to watch: Maya's website designs are due the 8th, so if the positioning shifts, that's the deadline that moves first.",
+      "brain": "ai",
+      "tools": [],
+      "ms": 10895,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Tasks created",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "6. Collaboration",
+      "sender": "Sarah",
+      "body": "risk check",
+      "reply": "Short answer: yes — mostly schedule risk, not scope risk.\n\nThe Website Launch chain is a straight line with almost no slack: Website designs (Maya, 8th) → Authentication API (Rahul, 9th) → Frontend integration (Priya, 11th) → QA pass (Emma, 12th), launching the 13th. That's one day of buffer at the end, so any single slip — a design round, a backend fix, a QA bug — eats the launch date directly. Nobody has room to absorb a bad day.\n\nTwo softer ones: Maya and Rahul are both carrying mobile-app work (due Dec 1) on top of their website items, so their website dates are the first thing that'll bend; and Daniel's launch campaign prep is still unstarted with no positioning input, since the competitor research never got its category and the recommendations were never produced. That's the gap I'd worry about after the date risk.\n\nWant me to set a checkpoint on the 9th — if auth isn't done by then, we pull the launch conversation forward — and put the campaign positioning back to you with a category so Daniel isn't blocked?",
+      "brain": "ai",
+      "tools": [],
+      "ms": 30201,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Concrete risk answer",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "7. Blockers",
+      "sender": "Rahul",
+      "body": "API blocked",
+      "reply": "Marked the Authentication API as blocked and noted why — payment provider approval still pending. That's now the top of the chain: it holds Frontend integration (Priya, 11th) and the QA pass (Emma, 12th), so the 13th launch date has no room left.\n\nTwo things worth doing today: ping the provider for an approval ETA, and give Sarah a heads-up if it looks like it slips past the 9th.\n\nIs there a sandbox or test-mode provider account you could build against in the meantime, or does the work genuinely stop until they approve you?",
+      "brain": "ai",
+      "tools": [
+        "search_tasks",
+        "get_task_dependencies",
+        "update_task",
+        "record_event"
+      ],
+      "ms": 41070,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Blocker acknowledged",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "7. Blockers",
+      "sender": "Sarah",
+      "body": "launch impact",
+      "reply": "Yes — the website launch on the 13th, and it's the tight one. The chain is Maya's designs (8th) → Rahul's auth API (9th, now blocked) → Priya's frontend integration (11th) → Emma's QA (12th), with launch the next day. Every day the provider approval slips past the 9th pushes that whole line back one day, so by Monday we'd already be eating into Emma's QA window.\n\nThe mobile app launch on 1 Dec isn't affected — Rahul's mobile backend task is separate and still unblocked.\n\nWant me to set a check-in with Rahul on Monday morning so we know early whether the 13th needs to move?",
+      "brain": "ai",
+      "tools": [],
+      "ms": 12061,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Explains downstream impact",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    }
+  ]
+}
