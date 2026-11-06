@@ -90,12 +90,18 @@ async function main() {
     setEnv('TEAMFORGE_API_KEY', randomBytes(24).toString('hex'));
     console.log('✓ Generated TEAMFORGE_API_KEY');
   }
+  if (!env.MONGODB_URI) setEnv('MONGODB_URI', 'mongodb://127.0.0.1:27017/teamforge-ops');
+  if (!env.PORT) setEnv('PORT', '4100');
+  if (!env.ORG_SLUG) setEnv('ORG_SLUG', 'acme');
   if (!env.ORG_NAME) setEnv('ORG_NAME', 'Teamforge Workspace');
   if (!env.OPENCODE_MODEL) setEnv('OPENCODE_MODEL', 'opencode-go/deepseek-v4.1-flash');
   if (!env.SWITCH_AGENT_SUFFIX) setEnv('SWITCH_AGENT_SUFFIX', '-tf');
   if (!env.SWITCH_ROOM_NAME) setEnv('SWITCH_ROOM_NAME', 'teamforge-lobby');
   if (!env.OPENCODE_TIMEOUT_MS) setEnv('OPENCODE_TIMEOUT_MS', '90000');
   if (!env.SWITCH_AI_RELAY) setEnv('SWITCH_AI_RELAY', 'false');
+  if (!env.SWITCH_AUTO_CONNECT) setEnv('SWITCH_AUTO_CONNECT', 'true');
+  if (!env.SWITCH_AUTO_PROVISION) setEnv('SWITCH_AUTO_PROVISION', 'true');
+  if (!env.SWITCH_AUTO_ROUTE) setEnv('SWITCH_AUTO_ROUTE', 'true');
 
   // 2) Switch discovery
   const { candidates, gateway } = detectSwitch();
@@ -135,7 +141,16 @@ async function main() {
     setEnv('SWITCH_AUTO_ROUTE', 'true');
   }
 
-  // 4) MongoDB
+  // 4) Tooling + MongoDB
+  const { spawnSync } = await import('node:child_process');
+  const opencode = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['opencode'], { encoding: 'utf8' });
+  if (opencode.status === 0) {
+    console.log('✓ OpenCode CLI found (AI brain)');
+  } else {
+    console.log('✗ OpenCode CLI not found on PATH. Install/sign in to OpenCode before live AI replies.');
+    console.log('  Without it, the app still runs and agents answer with the safe offline fallback.');
+  }
+
   const mongoUri = readEnv().MONGODB_URI || 'mongodb://127.0.0.1:27017/teamforge-ops';
   let mongoOk = false;
   try {
@@ -148,22 +163,26 @@ async function main() {
     await mongoose.disconnect();
   } else {
     console.log('✗ MongoDB is not reachable at ' + mongoUri);
-    console.log('  Start the MongoDB service, or run: docker compose up -d mongo');
+    console.log('  Start your MongoDB service, then re-run: npm run setup');
     console.log('  (TEAMFORGE stores everything in its own database, teamforge-ops.)');
   }
 
   // 5) Bootstrap org + jobs
   if (mongoOk) {
-    const { spawnSync } = await import('node:child_process');
     const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     const res = spawnSync(npm, ['run', 'seed'], { stdio: 'inherit', shell: process.platform === 'win32' });
     console.log(res.status === 0 ? '✓ Organization bootstrapped (no sample data)' : '✗ Bootstrap failed');
   }
 
+  console.log('\n.env is complete — you never need to edit it by hand.');
+  console.log('  config: .env');
+  console.log('  database: ' + (readEnv().MONGODB_URI || 'mongodb://127.0.0.1:27017/teamforge-ops'));
+  console.log('  switch: ' + (readEnv().SWITCH_SERVER_URL || 'not detected'));
+  console.log('  model: ' + (readEnv().OPENCODE_MODEL || 'opencode default'));
   console.log('\nNext:');
   console.log('  npm run dev        # API + Switch agents (:4100)');
   console.log('  npm run dev:web    # dashboard (:5183)');
-  if (!token) console.log('\nLive agents will stay offline until SWITCH_REGISTRATION_TOKEN is set. Dashboard/tools still work.');
+  if (!readEnv().SWITCH_REGISTRATION_TOKEN) console.log('\nLive agents stay offline until SWITCH_REGISTRATION_TOKEN is set (add it to .env and re-run setup).');
   console.log('Then say anything in the Switch room — no @mention needed.\n');
   process.exit(0);
 }

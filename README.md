@@ -80,30 +80,45 @@ A persistent MongoDB scheduler posts the morning brief, overdue scans with depen
 
 ## Quick start
 
-**You need:** Node 20+ · MongoDB running · Switch Console open, with its local server and Discord connection active.
+**Install these first (the repo can't install system software for you):**
+
+| Requirement | Notes |
+|---|---|
+| **Node.js 20+** | `node -v` should work |
+| **MongoDB** | running locally (`mongodb://127.0.0.1:27017`); the repo uses its own `teamforge-ops` database |
+| **OpenCode CLI** | installed and signed in — this is the AI brain |
+| **Switch Console** | open, local server running, Discord connected, your Discord account linked |
+
+Then:
 
 ```bash
 git clone <your-repo> teamforge
 cd teamforge
 npm install
-npm run setup      # one-time: creates .env, finds Switch, checks Mongo, bootstraps org
+npm run setup      # creates and fills .env for you
 npm run dev        # API + six agents  → http://127.0.0.1:4100
 npm run dev:web    # dashboard        → http://127.0.0.1:5183
 ```
 
-`npm run setup` automates almost everything:
+**You never edit `.env` by hand.** `npm run setup` is idempotent and does all of this:
 
-- creates `.env` with a strong API key,
-- finds your local Switch server and checks its health,
-- verifies MongoDB,
-- applies sane defaults (model, room name, agent names),
-- bootstraps the organization and recurring jobs — **with no sample data**.
+- creates `.env` from `.env.example` if it's missing,
+- generates a strong `TEAMFORGE_API_KEY`,
+- sets the database, ports, org, room name, model and timeouts,
+- discovers your local Switch server (reads its `ports.json`, then common ports) and health-checks it,
+- verifies MongoDB is reachable and OpenCode is on PATH,
+- bootstraps the organization and recurring jobs (**no sample data**),
+- asks for the **Switch registration key** once, if missing.
 
-**The one thing setup can't create for you** is a Switch **registration key** — it's an admin credential. Setup opens the Gateway and asks for it once:
+**The one value setup can't create** is the Switch registration key — it's an admin credential:
 
-> Gateway → **API Keys** → create a key of type **registration** → paste it.
+> Switch Gateway → **API Keys** → create a key of type **registration** → paste it when setup asks.
 
-After that, first boot registers all six agents and provisions the Discord channel automatically. Without a key, the dashboard, memory and tools still work; the agents stay offline and say so honestly.
+After that, the first `npm run dev` registers the six agents, connects them, creates the room **`teamforge-lobby`** (and its Discord channel via the bridge), invites the agents, and schedules the daily jobs. No further configuration.
+
+If the registration key isn't available yet, the app still runs: dashboard, memory, tasks, approvals and scheduler work; agents stay offline and the runtime says so honestly.
+
+Re-run `npm run setup` any time; it only fills in what's missing.
 
 ---
 
