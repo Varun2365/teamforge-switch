@@ -9,6 +9,7 @@ import { governanceRoutes } from './routes/governance.js';
 import { toolRoutes } from './routes/tools.js';
 import { mcpRoutes } from './routes/mcp.js';
 import { openapiRoutes } from './routes/openapi.js';
+import { queueRoutes } from './routes/queue.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -32,6 +33,7 @@ export async function buildApp() {
   await app.register(governanceRoutes);
   await app.register(toolRoutes);
   await app.register(mcpRoutes);
+  await app.register(queueRoutes);
   await app.register(openapiRoutes);
 
   return app;

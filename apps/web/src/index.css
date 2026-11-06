@@ -509,6 +509,28 @@ textarea.ant-input::placeholder,
   color: var(--tf-ink-3);
 }
 
+.panel-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: auto;
+  padding: 10px 16px;
+  border-top: 1px solid var(--tf-line-soft);
+  font-size: 11.5px;
+  color: var(--tf-ink-3);
+}
+
+.panel-footer .legend-dot {
+  width: 8px;
+  height: 8px;
+  flex-basis: 8px;
+}
+
+.panel-footer-end {
+  margin-left: auto;
+}
+
 /* ── Pulse band ────────────────────────────────────────────────────────── */
 
 .pulse-card .ant-card-body {

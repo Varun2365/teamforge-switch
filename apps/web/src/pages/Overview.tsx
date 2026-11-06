@@ -157,6 +157,7 @@ export default function OverviewPage() {
   }
 
   const atRisk = data.projects.filter((project) => project.health !== 'on_track');
+  const onTrackCount = data.projects.filter((project) => project.health === 'on_track').length;
   const projectNames = atRisk.slice(0, 3).map((project) => project.name).join(', ');
 
   const scheduledUpcoming = [
@@ -359,6 +360,7 @@ export default function OverviewPage() {
         <Row gutter={[20, 20]}>
           <Col xs={24} xl={15}>
             <Panel
+              className="fill"
               flush
               title="Projects at a glance"
               action={
@@ -387,11 +389,21 @@ export default function OverviewPage() {
                 })}
                 locale={{ emptyText: 'No active projects.' }}
               />
+              <div className="panel-footer">
+                <span>
+                  <span className="legend-dot" style={{ background: '#16a34a' }} /> {onTrackCount} on track
+                </span>
+                <span>
+                  <span className="legend-dot" style={{ background: '#d97706' }} /> {atRisk.length} at risk
+                </span>
+                <span className="panel-footer-end">{data.openTasks} open tasks org-wide</span>
+              </div>
             </Panel>
           </Col>
 
           <Col xs={24} xl={9}>
             <Panel
+              className="fill"
               title="Next deadlines"
               action={
                 <Link to="/tasks" className="panel-link">

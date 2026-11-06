@@ -211,12 +211,18 @@ export default function ScheduledPage() {
       title: 'Due',
       dataIndex: 'dueAt',
       width: 158,
-      render: (value: string) => (
+      render: (value: string, reminder) => (
         <div>
           <div className="cell-primary" style={{ fontWeight: 500 }}>
             {formatDateTime(value)}
           </div>
-          <div className="cell-secondary">{timeUntil(value)}</div>
+          <div className="cell-secondary">
+            {reminder.status === 'sent'
+              ? `sent ${timeAgo(reminder.lastSentAt ?? value)}`
+              : reminder.status === 'cancelled'
+                ? 'cancelled'
+                : timeUntil(value)}
+          </div>
         </div>
       ),
     },
@@ -585,7 +591,15 @@ export default function ScheduledPage() {
               colon={false}
               labelStyle={{ width: 150, color: '#64748b' }}
               items={[
-                { key: 'due', label: 'Due', children: `${formatDateTime(selected.dueAt)} · ${timeUntil(selected.dueAt)}` },
+                {
+                  key: 'due',
+                  label: 'Due',
+                  children: `${formatDateTime(selected.dueAt)} · ${
+                    selected.status === 'sent'
+                      ? `sent ${timeAgo(selected.lastSentAt ?? selected.dueAt)}`
+                      : timeUntil(selected.dueAt)
+                  }`,
+                },
                 { key: 'recipient', label: 'Recipient', children: recipientLabel(selected) },
                 { key: 'repeat', label: 'Cadence', children: repeatLabel(selected.repeatRule) },
                 {

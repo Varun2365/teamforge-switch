@@ -174,8 +174,19 @@ class SwitchRuntime {
     }
   }
 
-  getStatus(): RuntimeStatus {
-    const agents = [...this.agents.values()].map((agent) => {
+  /** In-memory ingest queue + presence — surfaced on the Queue page. */
+  getQueueStats() {
+    const agents = [...this.agents.values()];
+    return {
+      activeRoomQueues: this.roomQueues.size,
+      connectedAgents: agents.filter((a) => a.client?.isConnected).length,
+      totalAgents: agents.length,
+      roomId: this.roomId,
+      roomName: config.SWITCH_ROOM_NAME,
+    };
+  }
+
+  getStatus(): RuntimeStatus {    const agents = [...this.agents.values()].map((agent) => {
       const state = agent.client?.state;
       return {
         key: agent.key,

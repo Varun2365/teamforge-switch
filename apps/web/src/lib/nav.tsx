@@ -12,6 +12,7 @@ import {
   SettingOutlined,
   TeamOutlined,
   HistoryOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 
 export interface NavEntry {
@@ -85,6 +86,13 @@ export const NAV_GROUPS: NavGroup[] = [
         description: 'Reminders and proactive jobs',
         icon: <ScheduleOutlined />,
         keywords: 'scheduled reminders proactive jobs scheduler queue upcoming',
+      },
+      {
+        path: '/queue',
+        label: 'Queue',
+        description: 'Live deliveries, stuck work and controls',
+        icon: <SyncOutlined />,
+        keywords: 'queue pending jobs stuck processing pause cancel scheduler controls',
       },
     ],
   },

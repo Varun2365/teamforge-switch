@@ -1,4 +1,5 @@
 import { ScheduledJobModel, ReminderModel } from '../db/models/comms.js';
+import { MessageModel } from '../db/models/switch.js';
 import { OrganizationModel } from '../db/models/org.js';
 import { config } from '../config.js';
 import { deliverNotification } from '../services/notificationService.js';
@@ -7,6 +8,40 @@ import { runMorningBrief, runOverdueScan, runDeadlineFollowup, runCommitmentChec
 import { logAgentAction } from '../services/audit.js';
 
 const INSTANCE_ID = `api-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+let schedulerPaused = false;
+
+export function isSchedulerPaused(): boolean {
+  return schedulerPaused;
+}
+
+/** Pause/resume all proactive execution (the queue page toggles this). */
+export function setSchedulerPaused(paused: boolean): void {
+  schedulerPaused = paused;
+  console.log(`[scheduler] ${paused ? 'paused' : 'resumed'} by operator`);
+}
+
+/** Cancel pending jobs (optionally only a kind). Reminder jobs also cancel their reminders. */
+export async function cancelPendingJobs(orgId: string, kind?: string): Promise<number> {
+  const filter: Record<string, unknown> = { orgId, status: 'pending' };
+  if (kind) filter.kind = kind;
+  const res = await ScheduledJobModel.updateMany(filter, { $set: { status: 'cancelled' } });
+  if (!kind || kind === 'reminder') {
+    await ReminderModel.updateMany(
+      { orgId, status: { $in: ['scheduled', 'snoozed'] } },
+      { $set: { status: 'cancelled' } },
+    );
+  }
+  return res.modifiedCount ?? 0;
+}
+
+/** Clear messages stuck in "processing" (older than two minutes) so they stop haunting the UI. */
+export async function clearStuckMessages(orgId: string): Promise<number> {
+  const res = await MessageModel.updateMany(
+    { orgId, 'processingResult.status': 'processing', updatedAt: { $lt: new Date(Date.now() - 120_000) } },
+    { $set: { 'processingResult.status': 'error', 'processingResult.error': 'cleared from queue by operator', isProcessed: true } },
+  );
+  return res.modifiedCount ?? 0;
+}
 
 /** Atomically claim the next due job (lock 90s). Returns null when nothing is due. */
 async function claimJob() {
@@ -83,6 +118,7 @@ async function executeJob(job: { _id: string; orgId: string; kind: string; paylo
 }
 
 async function tick() {
+  if (schedulerPaused) return;
   for (let i = 0; i < 5; i++) {
     const job = await claimJob();
     if (!job) return;
