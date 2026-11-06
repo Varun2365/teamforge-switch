@@ -41,7 +41,7 @@ export default function SettingsPage() {
                 column={1}
                 size="small"
                 colon={false}
-                labelStyle={{ width: 150, color: '#8a97a8' }}
+                labelStyle={{ width: 150, color: '#64748b' }}
                 items={[
                   { key: 'name', label: 'Name', children: <span style={{ fontWeight: 600 }}>{String(org.data.name)}</span> },
                   { key: 'slug', label: 'Slug', children: <span className="mono">{String(org.data.slug)}</span> },
@@ -61,6 +61,19 @@ export default function SettingsPage() {
             ) : (
               <Alert type="warning" showIcon message="Couldn't load the organization profile." description="Is the API running on :4100?" />
             )}
+            <div
+              style={{
+                marginTop: 16,
+                paddingTop: 14,
+                borderTop: '1px solid #eef2f7',
+                fontSize: 11.5,
+                lineHeight: 1.6,
+                color: '#475569',
+              }}
+            >
+              Every query is scoped to this organization. People, projects, tasks and memory never cross the workspace
+              boundary.
+            </div>
           </Panel>
         </Col>
 
@@ -70,7 +83,7 @@ export default function SettingsPage() {
               column={1}
               size="small"
               colon={false}
-              labelStyle={{ width: 160, color: '#8a97a8' }}
+              labelStyle={{ width: 160, color: '#64748b' }}
               items={[
                 {
                   key: 'status',
@@ -147,7 +160,7 @@ export default function SettingsPage() {
                 </p>
                 <Space.Compact style={{ width: '100%', maxWidth: 520 }}>
                   <Input.Password
-                    prefix={<KeyOutlined style={{ color: '#8a97a8' }} />}
+                    prefix={<KeyOutlined style={{ color: '#64748b' }} />}
                     value={key}
                     onChange={(event) => setKey(event.target.value)}
                     placeholder="Paste TEAMFORGE_API_KEY…"
@@ -196,7 +209,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <LockOutlined style={{ color: '#8a97a8' }} />
+                  <LockOutlined style={{ color: '#64748b' }} />
                   <span className="cell-primary" style={{ fontWeight: 600 }}>Later milestone</span>
                 </div>
                 <p className="cell-secondary" style={{ margin: 0, lineHeight: 1.65 }}>

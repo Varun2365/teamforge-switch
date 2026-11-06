@@ -75,7 +75,7 @@ export default function PeoplePage() {
     {
       title: '',
       width: 40,
-      render: () => <RightOutlined style={{ fontSize: 10, color: '#8a97a8' }} />,
+      render: () => <RightOutlined style={{ fontSize: 10, color: '#64748b' }} />,
     },
   ];
 
@@ -92,8 +92,9 @@ export default function PeoplePage() {
             </Tag>
             <Input
               allowClear
-              prefix={<SearchOutlined style={{ color: '#8a97a8' }} />}
+              prefix={<SearchOutlined style={{ color: '#64748b' }} />}
               placeholder="Search people, titles…"
+              aria-label="Search people"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               style={{ width: 280 }}
@@ -116,7 +117,14 @@ export default function PeoplePage() {
             scroll={{ x: 760 }}
             onRow={(record) => ({
               onClick: () => navigate(`/people/${record.id}`),
+              onKeyDown: (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate(`/people/${record.id}`);
+                }
+              },
               className: 'clickable-row',
+              tabIndex: 0,
             })}
             locale={{ emptyText: 'No people match that search.' }}
           />
@@ -179,7 +187,7 @@ export default function PeoplePage() {
                     {person.data.skills.map((skill) => (
                       <Tag key={skill.name} className="skill-tag" variant="filled">
                         {skill.name}
-                        <span className="mono" style={{ marginLeft: 6, color: '#8a97a8' }}>
+                        <span className="mono" style={{ marginLeft: 6, color: '#64748b' }}>
                           L{skill.level}
                         </span>
                       </Tag>

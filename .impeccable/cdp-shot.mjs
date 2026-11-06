@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const port = 9333;
+const port = 9300 + (process.pid % 600);
 const [, , url, out, widthArg = '1440', heightArg = '1150', evalExpr = '', waitArg = '4500'] = process.argv;
 const width = Number(widthArg);
 const height = Number(heightArg);

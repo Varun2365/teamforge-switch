@@ -80,6 +80,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
           variant="borderless"
           prefix={<SearchOutlined />}
           placeholder="Jump to a page or action…"
+          aria-label="Search or jump to a page"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={onKeyDown}
@@ -110,7 +111,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
                     {item.description}
                   </span>
                 </span>
-                {index === active ? <RightOutlined style={{ fontSize: 11, color: '#8a97a8' }} /> : null}
+                {index === active ? <RightOutlined style={{ fontSize: 11, color: '#64748b' }} /> : null}
               </div>
             </div>
           );

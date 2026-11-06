@@ -91,14 +91,15 @@ export default function MemoryPage() {
           <Input
             size="large"
             allowClear
-            prefix={<SearchOutlined style={{ color: '#8a97a8' }} />}
+            prefix={<SearchOutlined style={{ color: '#64748b' }} />}
             placeholder="Ask the memory — a person, project, decision, client or topic…"
+            aria-label="Search organizational memory"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             style={{ maxWidth: 760 }}
             autoFocus
           />
-          <div style={{ marginTop: 8, fontSize: 11.5, color: '#8a97a8' }}>
+          <div style={{ marginTop: 8, fontSize: 11.5, color: '#64748b' }}>
             Searches entity names and recorded facts. Try “ownership”, “launch”, “deadline”, or a person's name.
           </div>
         </div>
@@ -176,7 +177,7 @@ export default function MemoryPage() {
                         }}
                       >
                         <Space size={8}>
-                          <DatabaseOutlined style={{ color: '#8a97a8' }} />
+                          <DatabaseOutlined style={{ color: '#64748b' }} />
                           <span className="cell-primary" style={{ fontWeight: 500 }}>
                             {item.name}
                           </span>

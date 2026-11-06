@@ -95,7 +95,16 @@ export default function ProjectsPage() {
                 <Card
                   className="tf-card"
                   hoverable
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open project ${project.name}`}
                   onClick={() => setSelectedId(project.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedId(project.id);
+                    }
+                  }}
                   styles={{ body: { padding: 20 } }}
                   style={{ height: '100%' }}
                 >
@@ -159,7 +168,7 @@ export default function ProjectsPage() {
                       paddingTop: 12,
                       borderTop: '1px solid #eef2f7',
                       fontSize: 11.5,
-                      color: '#8a97a8',
+                      color: '#64748b',
                     }}
                   >
                     <span>

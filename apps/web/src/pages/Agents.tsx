@@ -37,7 +37,7 @@ export default function AgentsPage() {
         description="Six always-on Switch agents. Unaddressed messages go to the operations manager; specialists join when needed — no @mention required."
         extra={
           <Space size={8}>
-            <FilterOutlined style={{ color: '#8a97a8' }} />
+            <FilterOutlined style={{ color: '#64748b' }} />
             <Select
               value={filter}
               onChange={setFilter}

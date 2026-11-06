@@ -28,6 +28,11 @@ const configSchema = z.object({
   OPENCODE_MODEL: z.string().default(''), // blank = OpenCode's default model
   OPENCODE_TIMEOUT_MS: z.coerce.number().default(120000),
   AI_FALLBACK_DETERMINISTIC: z.string().default('true').transform((v) => v !== 'false'),
+  // ── Switch relay mode (opt-in): when true, the router forwards each human message to a
+  // Switch-managed AI agent (created in Switch Console) instead of calling the model locally.
+  SWITCH_AI_RELAY: z.string().default('false').transform((v) => v === 'true' || v === '1'),
+  SWITCH_AI_AGENT_NAME: z.string().default('teamforge-ai'),
+  AI_LOCAL_FALLBACK: z.string().default('true').transform((v) => v !== 'false'),
 
   // Switch (local server: bridge 56565, Gateway 56564). The AI lives in the
   // six always-on Switch agent clients this backend runs — no external LLM.

@@ -303,7 +303,14 @@ export default function TasksPage() {
               scroll={{ x: 860 }}
               onRow={(task) => ({
                 onClick: () => setSelected(task.id),
+                onKeyDown: (event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelected(task.id);
+                  }
+                },
                 className: 'clickable-row',
+                tabIndex: 0,
               })}
               locale={{
                 emptyText: (

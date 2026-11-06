@@ -324,7 +324,17 @@ export default function OverviewPage() {
                 pagination={false}
                 size="middle"
                 scroll={{ x: 560 }}
-                onRow={() => ({ onClick: () => navigate('/projects'), className: 'clickable-row' })}
+                onRow={() => ({
+                  onClick: () => navigate('/projects'),
+                  onKeyDown: (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      navigate('/projects');
+                    }
+                  },
+                  className: 'clickable-row',
+                  tabIndex: 0,
+                })}
                 locale={{ emptyText: 'No active projects.' }}
               />
             </Panel>

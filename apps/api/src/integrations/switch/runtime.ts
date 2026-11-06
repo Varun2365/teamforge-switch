@@ -350,6 +350,17 @@ class SwitchRuntime {
       }
     }
 
+    // Capture the Switch-managed AI agent's answer (relay mode) for the dashboard/audit.
+    if (senderKind === 'agent' && config.SWITCH_AI_RELAY && normalizeName(senderName) === normalizeName(config.SWITCH_AI_AGENT_NAME)) {
+      await MessageModel.findOneAndUpdate(
+        { orgId: this.organizationId, roomId, 'processingResult.status': 'relayed' },
+        { $set: { 'processingResult.status': 'replied', 'processingResult.reply': body, 'processingResult.brain': 'switch-agent', 'processingResult.repliedAt': new Date().toISOString() } },
+        { sort: { createdAt: -1 } },
+      ).catch(() => undefined);
+      await logAgentAction(this.organizationId, `agent:${config.SWITCH_AI_AGENT_NAME}`, 'ai_agent_reply', { roomId, outputSummary: body.replace(/\s+/g, ' ').slice(0, 300) });
+      return;
+    }
+
     if (!shouldRespond(agent.key, senderKind, addressed, mentions, handoffForMe)) return;
     if (!config.SWITCH_AUTO_ROUTE) return;
 
@@ -377,6 +388,17 @@ class SwitchRuntime {
         addressed: addressed || mentions.length > 0,
         handoffForMe,
       });
+
+      if (reply.relayed) {
+        await this.finishMessage(message._id, { status: 'relayed', relayedTo: config.SWITCH_AI_AGENT_NAME, at: new Date().toISOString() });
+        await logAgentAction(this.organizationId, this.agentActor(replyAgent), 'relayed_to_switch_agent', {
+          roomId,
+          inputSummary: body.slice(0, 300),
+          outputSummary: `Relayed to ${config.SWITCH_AI_AGENT_NAME} via Switch`,
+          durationMs: Date.now() - started,
+        });
+        return;
+      }
 
       let sentMessageId = '';
       try {
@@ -810,7 +832,7 @@ class SwitchRuntime {
   private async composeReply(
     agent: RuntimeAgent,
     input: { roomId: string; message: string; sender: { _id: string; name: string; role: string } | null; senderName: string; switchMessageId: string; addressed: boolean; handoffForMe: boolean },
-  ): Promise<{ body: string; toolsUsed: string[]; handoff?: { fromAgentKey: AgentKey; toAgentKey: AgentKey; instruction: string }; durationMs: number; source: 'ai' | 'fallback' | 'error' }> {
+  ): Promise<{ body: string; toolsUsed: string[]; handoff?: { fromAgentKey: AgentKey; toAgentKey: AgentKey; instruction: string }; durationMs: number; source: 'ai' | 'switch' | 'fallback' | 'error'; relayed?: boolean }> {
     const started = Date.now();
     const conversation = await ConversationModel.findOne({ orgId: this.organizationId, roomId: input.roomId }).lean();
     const recentDocs = await MessageModel.find({ orgId: this.organizationId, roomId: input.roomId, switchMessageId: { $ne: input.switchMessageId } })
@@ -819,6 +841,29 @@ class SwitchRuntime {
       .lean();
     const recent = recentDocs.reverse().map((m) => ({ sender: m.senderName ?? 'teammate', body: m.body, at: m.sentAt ?? (m as { createdAt?: Date }).createdAt ?? new Date() }));
     const snapshot = await this.buildSnapshot();
+
+    // Switch relay mode: the reasoning happens INSIDE a Switch-managed agent session.
+    // We only forward the briefing through Switch; the managed agent posts the answer itself.
+    if (config.SWITCH_AI_RELAY && config.SWITCH_AI_AGENT_NAME) {
+      const relayEntry = this.pickEntry(agent.key);
+      if (relayEntry?.client?.isConnected) {
+        try {
+          await relayEntry.client.waitForConnection(5_000);
+          const lines = [
+            `[relay from ${agent.catalog.switchName}${this.suffix()} · room ${config.SWITCH_ROOM_NAME}]`,
+            `Sender: ${input.senderName}${input.sender ? ` (userId ${input.sender._id})` : ''} · role ${input.sender?.role ?? 'employee'}`,
+            `Recent conversation: ${recent.map((m) => `${m.sender}: ${m.body}`).join(' || ').slice(0, 1200) || '(none)'}`,
+            'Org snapshot:', snapshot,
+            'Message to answer:', input.message,
+            'Reply as the team\'s AI operations teammate: short, human, grounded in the TeamForge tools. Store durable facts/decisions/reminders via the tools. Do not mention tools or this relay.',
+          ];
+          await relayEntry.client.sendTargetedMessage(lines.join('\n'), [config.SWITCH_AI_AGENT_NAME]);
+          return { body: '', toolsUsed: [], durationMs: Date.now() - started, source: 'switch', relayed: true };
+        } catch (error) {
+          logger.warn({ error: error instanceof Error ? error.message : String(error) }, 'Switch AI relay failed; falling back to local brain');
+        }
+      }
+    }
 
     const ai = await askTeamForgeAI({
       orgId: this.organizationId,

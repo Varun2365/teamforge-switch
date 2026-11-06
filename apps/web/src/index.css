@@ -3,7 +3,7 @@
   --tf-azure-deep: #0958d9;
   --tf-ink: #0f172a;
   --tf-ink-2: #475569;
-  --tf-ink-3: #8a97a8;
+  --tf-ink-3: #64748b;
   --tf-line: #e6eaf0;
   --tf-line-soft: #eef2f7;
   --tf-ground: #f5f7fa;
@@ -63,6 +63,15 @@ body {
 
 *::-webkit-scrollbar-track {
   background: transparent;
+}
+
+.ant-input-affix-wrapper input::placeholder,
+.ant-input::placeholder,
+textarea.ant-input::placeholder,
+.ant-select-selection-placeholder,
+.ant-picker-input input::placeholder {
+  color: #64748b !important;
+  opacity: 1;
 }
 
 /* ── Shell ─────────────────────────────────────────────────────────────── */
@@ -125,7 +134,7 @@ body {
   font-size: 11px;
   line-height: 1.2;
   letter-spacing: 0.02em;
-  color: #7c8ba1;
+  color: #93a3b8;
 }
 
 .app-nav {
@@ -150,7 +159,7 @@ body {
   font-weight: 600;
   letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: #5f7089;
+  color: #7f90a6;
 }
 
 .sider-foot {
@@ -190,7 +199,7 @@ body {
   font-family: var(--tf-font-mono);
   font-size: 10px;
   line-height: 1.5;
-  color: #6f7e93;
+  color: #8fa0b5;
   overflow-wrap: anywhere;
 }
 
@@ -200,7 +209,7 @@ body {
   border-top: 1px solid rgba(148, 163, 184, 0.1);
   font-size: 10.5px;
   line-height: 1.45;
-  color: #6f7e93;
+  color: #8fa0b5;
 }
 
 .app-header.ant-layout-header {
@@ -677,7 +686,7 @@ a.attention-item:hover .attention-title {
   padding-top: 1px;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1360px) {
   .attention-strip {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
