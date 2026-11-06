@@ -16,3 +16,6 @@ apps/api/live.log
 
 # Local-only demo/recording runbook
 RECORDING.md
+
+# Local blog draft (not published in the repo)
+blog.md
