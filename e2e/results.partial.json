@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-06T13:15:16.817Z",
+  "generatedAt": "2026-11-06T13:17:29.890Z",
   "results": [
     {
       "scenario": "0. Introduction",
@@ -563,6 +563,79 @@
       "checks": [
         {
           "label": "Explains downstream impact",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "7. Blockers",
+      "sender": "Sarah",
+      "body": "ask Priya via integration",
+      "reply": "@Priya — can you start the frontend integration against mock API responses while Rahul's auth API is stuck on the payment provider approval? If that works, it keeps your 11th date and Emma's QA on the 12th intact for the 13th launch. Tell me either way and I'll adjust the plan around it.",
+      "brain": "ai",
+      "tools": [],
+      "ms": 20570,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Message/task prepared, no fabricated reply",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "7. Blockers",
+      "sender": "Priya",
+      "body": "mock response confirmation",
+      "reply": "Perfect, Priya — that keeps your 11th and Emma's 12th intact, so the 13th stays alive.\n\nPlan on mock responses for now, and swap the real auth API in as soon as the provider approval lands. Keep the mock layer thin so that swap is cheap, since one thing to watch is that Emma's QA on the 12th would be against mocks rather than the live API — worth a quick re-test once Rahul's real endpoint is in.\n\nThanks for the fast answer, that unblocks the whole chain.",
+      "brain": "ai",
+      "tools": [],
+      "ms": 35113,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Records confirmation",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "8. Decisions",
+      "sender": "Sarah",
+      "body": "Stripe decision",
+      "reply": "Got it — logged as an active decision on the Website Launch project: Stripe replaces Razorpay as our payment provider.\n\nOne thing it touches: Rahul's Authentication API is still blocked on the old payment provider approval. Is Stripe already approved and ready to integrate? If so, tell me and I'll get that blocker cleared so the 9th holds.",
+      "brain": "ai",
+      "tools": [
+        "search_projects",
+        "find_entity",
+        "search_organization_memory",
+        "record_decision"
+      ],
+      "ms": 62875,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Decision stored",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "scenario": "8. Decisions",
+      "sender": "Sarah",
+      "body": "why Stripe",
+      "reply": "The decision's on record as of today — Stripe replaces Razorpay as our payment provider — but the *reason* didn't get captured, so I don't want to make one up for you.\n\nThe only related context I have is that Rahul's Authentication API is blocked on the old provider's approval. Was switching to Stripe mainly about unblocking that, or were there other factors (fees, docs, existing setup)? Tell me and I'll log the rationale against the decision so it's there next time someone asks.",
+      "brain": "ai",
+      "tools": [],
+      "ms": 14501,
+      "status": "replied",
+      "checks": [
+        {
+          "label": "Returns recorded decision, admits missing rationale",
           "pass": true,
           "detail": ""
         }

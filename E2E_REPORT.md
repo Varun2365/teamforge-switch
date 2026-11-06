@@ -1,8 +1,8 @@
 # TEAMFORGE — End-to-End Verification Report
-Generated: 2026-11-06T13:14:33.402Z · live runtime · MongoDB `teamforge-ops` · org **Acme Technologies** (created entirely through messages)
+Generated: 2026-11-06T13:15:34.898Z · live runtime · MongoDB `teamforge-ops` · org **Acme Technologies** (created entirely through messages)
 
 ## Summary
-- **PASS**: 23
+- **PASS**: 25
 - **FAIL**: 3
 
 | # | Scenario | Sender | Message | Actual reply (trimmed) | Brain | Tools | Checks | Verdict |
@@ -33,6 +33,8 @@ Generated: 2026-11-06T13:14:33.402Z · live runtime · MongoDB `teamforge-ops` �
 | 24 | 6. Collaboration | Sarah | competitor research | I don't have any competitor or market intel on record for Acme — and "our industry" is the one detail I can't guess without invent | ai | — | 1/1 | **PASS** |
 | 25 | 6. Collaboration | Sarah | tasks from research | Careful — there are no recommendations to convert yet. My competitor note stopped at the one thing I couldn't guess: the category. | ai | — | 1/1 | **PASS** |
 | 26 | 6. Collaboration | Sarah | risk check | Short answer: yes — mostly schedule risk, not scope risk.  The Website Launch chain is a straight line with almost no slack: Websi | ai | — | 1/1 | **PASS** |
+| 27 | 7. Blockers | Rahul | API blocked | Marked the Authentication API as blocked and noted why — payment provider approval still pending. That's now the top of the chain: | ai | search_tasks, get_task_dependencies, update_task, record_event | 1/1 | **PASS** |
+| 28 | 7. Blockers | Sarah | launch impact | Yes — the website launch on the 13th, and it's the tight one. The chain is Maya's designs (8th) → Rahul's auth API (9th, now block | ai | — | 1/1 | **PASS** |
 
 ## Evidence detail
 ### 0. Introduction — Sarah: introduces the team
@@ -230,6 +232,24 @@ The Website Launch chain is a straight line with almost no slack: Website design
 Two softer ones: Maya and Rahul are both carrying mobile-app work (due Dec 1) on top of their website items, so their website dates are the first thing that'll bend; and Daniel's launch campaign prep is still unstarted with no positioning input, since the competi
 - **Brain:** ai · **Latency:** 30201ms · **Tools:** none
 - ✅ Concrete risk answer
+
+### 7. Blockers — Rahul: API blocked
+- **Reply:** Marked the Authentication API as blocked and noted why — payment provider approval still pending. That's now the top of the chain: it holds Frontend integration (Priya, 11th) and the QA pass (Emma, 12th), so the 13th launch date has no room left.
+
+Two things worth doing today: ping the provider for an approval ETA, and give Sarah a heads-up if it looks like it slips past the 9th.
+
+Is there a sandbox or test-mode provider account you could build against in the meantime, or does the work genuinely stop until they approve you?
+- **Brain:** ai · **Latency:** 41070ms · **Tools:** search_tasks, get_task_dependencies, update_task, record_event
+- ✅ Blocker acknowledged
+
+### 7. Blockers — Sarah: launch impact
+- **Reply:** Yes — the website launch on the 13th, and it's the tight one. The chain is Maya's designs (8th) → Rahul's auth API (9th, now blocked) → Priya's frontend integration (11th) → Emma's QA (12th), with launch the next day. Every day the provider approval slips past the 9th pushes that whole line back one day, so by Monday we'd already be eating into Emma's QA window.
+
+The mobile app launch on 1 Dec isn't affected — Rahul's mobile backend task is separate and still unblocked.
+
+Want me to set a check-in with Rahul on Monday morning so we know early whether the 13th needs to move?
+- **Brain:** ai · **Latency:** 12061ms · **Tools:** none
+- ✅ Explains downstream impact
 
 ## Method & honest limitations
 - Messages are injected at the Switch ingest boundary (`/api/debug/simulate-message`); the runtime processes them exactly like a Switch room event and replies are posted to the real `#teamforge-lobby` via Switch. Assertions read MongoDB directly.

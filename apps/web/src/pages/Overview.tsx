@@ -57,6 +57,11 @@ function PulseMetric({
   );
 }
 
+function decisionByLabel(decidedBy?: string[]) {
+  const named = (decidedBy ?? []).filter((value) => !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(value));
+  return named.length ? ` · ${named.join(', ')}` : '';
+}
+
 function AttentionTile({
   to,
   icon,
@@ -441,7 +446,7 @@ export default function OverviewPage() {
                         </div>
                         <div className="cell-secondary" style={{ marginTop: 3 }}>
                           {formatDate(decision.decidedAt)}
-                          {decision.decidedBy?.length ? ` · ${decision.decidedBy.join(', ')}` : ''}
+                          {decisionByLabel(decision.decidedBy)}
                         </div>
                       </div>
                     ),
