@@ -1,0 +1,25 @@
+{
+  "name": "teamforge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TEAMFORGE — AI-powered organizational intelligence & operations, powered by Switch",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @teamforge/api",
+    "dev:web": "npm run dev -w @teamforge/web",
+    "build": "npm run build -w @teamforge/shared && npm run build -w @teamforge/api && npm run build -w @teamforge/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w @teamforge/api",
+    "seed": "npm run seed -w @teamforge/api",
+    "check:mcp": "node scripts/check-mcp.mjs",
+    "verify:switch": "node scripts/verify-switch.mjs",
+    "demo": "npm run check:mcp -- get_organization_overview {}"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

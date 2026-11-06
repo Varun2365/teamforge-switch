@@ -1,0 +1,25 @@
+# MongoDB for machines without the local Windows service.
+# On THIS machine you do not need this file — MongoDB 8.2 already runs as a
+# Windows service on 127.0.0.1:27017 and the app points at the `teamforge-ops`
+# database by default. It is provided so a teammate can `docker compose up -d`
+# and get an identical database in one command.
+#
+# Note: the full API + dashboard are intentionally NOT containerized yet —
+# they are verified running on the host (see README). A production compose
+# file is tracked as follow-up work in PHASES.md.
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongo-data:

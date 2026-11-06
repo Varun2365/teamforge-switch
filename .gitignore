@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+data/
+coverage/
+.DS_Store
+.vite/
+# Machine-local agent configs (rendered from .env by scripts/render-agent-dirs.mjs)
+switch/agents/**/opencode.json
