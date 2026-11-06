@@ -9,3 +9,7 @@ coverage/
 .vite/
 # Machine-local agent configs (rendered from .env by scripts/render-agent-dirs.mjs)
 switch/agents/**/opencode.json
+apps/api/brain/opencode.json
+apps/api/brain/inbox-*.md
+apps/api/brain/test-out*
+apps/api/live.log

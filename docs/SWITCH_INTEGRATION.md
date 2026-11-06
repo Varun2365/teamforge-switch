@@ -7,7 +7,7 @@ _Updated 2026-11-06 after live verification against the local Switch server (0.3
 TEAMFORGE runs its agents as **custom Switch agent clients** (the Agent Protocol), not as Switch Console-managed provider sessions. This mirrors the earlier `D:\WeMakeDevs` build and is the only architecture that delivers the product behaviour people expect:
 
 - **No mention required.** Switch's own managed-agent sessions start on address; custom clients connect with `scope=all, filter=all`, receive every room message, and route internally. Unaddressed human messages go to the operations manager.
-- **No third-party model provider.** The brain is a deterministic, tool-grounded reasoning engine calling the same 53 business tools as the dashboard. (An LLM can be layered later behind the same interface; nothing here needs one.)
+- **AI brain (owner-directed).** Every message goes to the OpenCode model (the team owner's plan), headless, with the TeamForge MCP server attached. The model decides what to retrieve, what to store, which tools to call, and how to word the reply. A deterministic engine exists only as an offline fallback when the CLI is unavailable.
 - **One voice.** Only the operations manager answers unaddressed traffic; specialists answer explicit @mentions or `TEAMFORGE_HANDOFF` delegations. Agent and system messages are recorded and never answered — loop prevention by construction.
 - **Flat operational surface.** Everything is registered on boot from one `.env`: one registration key, six identities, one room, auto-provisioned on the Discord bridge.
 

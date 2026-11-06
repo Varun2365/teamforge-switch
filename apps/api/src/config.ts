@@ -20,7 +20,14 @@ const configSchema = z.object({
   TEAMFORGE_API_KEY: z.string().min(8).default('change-me-dev-key'),
   MONGODB_URI: z.string().default('mongodb://127.0.0.1:27017/teamforge-ops'),
   ORG_SLUG: z.string().default('acme'),
+  ORG_NAME: z.string().default('Teamforge Workspace'),
   ORG_TIMEZONE: z.string().default('Asia/Kolkata'),
+
+  // ── AI brain: your OpenCode plan, headless. The model decides tools, memory and replies. ──
+  OPENCODE_BRAIN_DIR: z.string().default('brain'),
+  OPENCODE_MODEL: z.string().default(''), // blank = OpenCode's default model
+  OPENCODE_TIMEOUT_MS: z.coerce.number().default(120000),
+  AI_FALLBACK_DETERMINISTIC: z.string().default('true').transform((v) => v !== 'false'),
 
   // Switch (local server: bridge 56565, Gateway 56564). The AI lives in the
   // six always-on Switch agent clients this backend runs — no external LLM.

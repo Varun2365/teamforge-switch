@@ -1,137 +1,482 @@
-import { Link } from 'react-router-dom';
-import { AlertTriangle, Bot, CheckCircle2, ClipboardList, Flame, FolderKanban, Inbox, Siren, Users } from 'lucide-react';
-import { useOverview } from '../lib/hooks';
-import { Panel, Chip, Spinner, ErrorBox, timeAgo, healthChip, formatDate } from '../components/ui';
+import { Link, useNavigate } from 'react-router-dom';
+import { Alert, Button, Card, Col, List, Row, Skeleton, Space, Table, Tag, Timeline } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import {
+  ArrowRightOutlined,
+  CheckSquareOutlined,
+  ClockCircleOutlined,
+  InboxOutlined,
+  ProjectOutlined,
+  RobotOutlined,
+  StopOutlined,
+  TeamOutlined,
+  WarningOutlined,
+} from '@ant-design/icons';
+import { useOverview, useSwitchStatus } from '../lib/hooks';
+import type { Overview } from '../lib/api';
+import {
+  Chip,
+  ErrorBox,
+  PageHeader,
+  Panel,
+  formatDate,
+  formatLongDate,
+  healthChip,
+  priorityChip,
+  statusChip,
+  timeAgo,
+} from '../components/ui';
 
-function Stat({ label, value, tone = 'ink', icon: Icon }: { label: string; value: number | string; tone?: 'ink' | 'warn' | 'danger' | 'ok'; icon: typeof Flame }) {
-  const color = tone === 'danger' ? 'text-[var(--color-danger)]' : tone === 'warn' ? 'text-[var(--color-warn)]' : tone === 'ok' ? 'text-[var(--color-ok)]' : 'text-[var(--color-ink)]';
+type PulseTone = 'default' | 'warning' | 'danger' | 'success';
+
+function PulseMetric({
+  label,
+  value,
+  foot,
+  icon,
+  tone = 'default',
+}: {
+  label: string;
+  value: number;
+  foot: string;
+  icon: React.ReactNode;
+  tone?: PulseTone;
+}) {
   return (
-    <div className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-4">
-      <div className="flex items-center justify-between">
-        <span className="stat-label">{label}</span>
-        <Icon size={14} className="text-[var(--color-ink-3)]" />
+    <div className={`pulse-metric${tone === 'default' ? '' : ` is-${tone}`}`}>
+      <div className="pulse-metric-top">
+        <span className="pulse-label">{label}</span>
+        <span className="pulse-icon">{icon}</span>
       </div>
-      <div className={`mt-2 text-[26px] font-bold leading-none tracking-tight ${color}`}>{value}</div>
+      <div className="pulse-value">{value}</div>
+      <div className="pulse-foot">{foot}</div>
+    </div>
+  );
+}
+
+function AttentionTile({
+  to,
+  icon,
+  tone,
+  title,
+  description,
+  count,
+  countTone,
+}: {
+  to: string;
+  icon: React.ReactNode;
+  tone?: 'danger' | 'warning';
+  title: string;
+  description: string;
+  count: React.ReactNode;
+  countTone?: string;
+}) {
+  return (
+    <Link to={to} className="attention-item" style={{ color: 'inherit' }}>
+      <span className={`attention-icon${tone ? ` is-${tone}` : ''}`}>{icon}</span>
+      <span className="attention-copy">
+        <span className="attention-title">{title}</span>
+        <span className="attention-desc">{description}</span>
+      </span>
+      <span className="attention-count" style={countTone ? { color: countTone } : undefined}>
+        {count}
+      </span>
+    </Link>
+  );
+}
+
+function OverviewSkeleton() {
+  return (
+    <div className="section-stack">
+      <Skeleton active paragraph={{ rows: 5 }} />
+      <Skeleton active paragraph={{ rows: 8 }} />
     </div>
   );
 }
 
 export default function OverviewPage() {
+  const navigate = useNavigate();
   const { data, isLoading, isError, error, refetch } = useOverview();
-  if (isLoading) return <Spinner />;
-  if (isError || !data) return <ErrorBox error={error} onRetry={() => refetch()} />;
+  const { data: sw } = useSwitchStatus();
 
-  const atRisk = data.projects.filter((p) => p.health !== 'on_track');
+  const live = sw?.server === 'reachable';
+  const online = sw?.runtime?.onlineAgents ?? 0;
+  const total = sw?.runtime?.agents.length ?? 6;
+
+  const header = (
+    <PageHeader
+      title="Operations overview"
+      description={`The live state of the organization — ${formatLongDate()}. Every number below is grounded in tool data.`}
+      extra={
+        <Space size={8} wrap>
+          <Tag color={live ? 'success' : 'warning'} variant="filled" style={{ marginInlineEnd: 0 }}>
+            {live ? `Switch live · ${online}/${total} agents` : 'Switch unreachable'}
+          </Tag>
+          {data && data.pendingApprovals > 0 && (
+            <Link to="/approvals">
+              <Button type="primary">
+                Review {data.pendingApprovals} approval{data.pendingApprovals === 1 ? '' : 's'}
+              </Button>
+            </Link>
+          )}
+        </Space>
+      }
+    />
+  );
+
+  if (isLoading) {
+    return (
+      <>
+        {header}
+        <OverviewSkeleton />
+      </>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <>
+        {header}
+        <ErrorBox error={error} onRetry={() => refetch()} />
+      </>
+    );
+  }
+
+  const atRisk = data.projects.filter((project) => project.health !== 'on_track');
+  const projectNames = atRisk.slice(0, 3).map((project) => project.name).join(', ');
+
+  const projectColumns: ColumnsType<Overview['projects'][number]> = [
+    {
+      title: 'Project',
+      dataIndex: 'name',
+      render: (name: string, project) => (
+        <div>
+          <div className="cell-primary">{name}</div>
+          <div className="cell-secondary">Due {formatDate(project.dueDate)}</div>
+        </div>
+      ),
+    },
+    {
+      title: 'Health',
+      dataIndex: 'health',
+      width: 110,
+      render: (health: string) => healthChip(health),
+    },
+    {
+      title: 'Open',
+      dataIndex: 'openTasks',
+      width: 80,
+      align: 'right',
+      render: (value: number) => <span className="number-cell">{value}</span>,
+    },
+    {
+      title: 'Overdue',
+      dataIndex: 'overdueTasks',
+      width: 96,
+      align: 'right',
+      render: (value: number) => (
+        <span className="number-cell" style={value > 0 ? { color: '#dc2626', fontWeight: 600 } : undefined}>
+          {value}
+        </span>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-4">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[22px] font-bold tracking-tight">Good to see you.</h1>
-          <p className="text-[12px] text-[var(--color-ink-2)]">Here's the state of Acme Technologies — {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-        </div>
-        {atRisk.length > 0 && (
-          <Link to="/projects" className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--color-warn)]">
-            <Siren size={13} /> {atRisk.length} project{atRisk.length > 1 ? 's' : ''} need{atRisk.length === 1 ? 's' : ''} attention
-          </Link>
+    <>
+      {header}
+
+      <div className="section-stack">
+        <Card className="tf-card pulse-card" variant="outlined">
+          <div className="pulse-grid">
+            <PulseMetric
+              label="Active projects"
+              value={data.activeProjects}
+              foot="In flight"
+              icon={<ProjectOutlined />}
+            />
+            <PulseMetric
+              label="People"
+              value={data.totalPeople}
+              foot="In the directory"
+              icon={<TeamOutlined />}
+            />
+            <PulseMetric
+              label="Open tasks"
+              value={data.openTasks}
+              foot="Unfinished work"
+              icon={<CheckSquareOutlined />}
+            />
+            <PulseMetric
+              label="Overdue"
+              value={data.overdueTasks}
+              foot="Past the due date"
+              icon={<ClockCircleOutlined />}
+              tone={data.overdueTasks > 0 ? 'danger' : 'success'}
+            />
+            <PulseMetric
+              label="Blocked"
+              value={data.blockedTasks}
+              foot="Needs unblocking"
+              icon={<StopOutlined />}
+              tone={data.blockedTasks > 0 ? 'warning' : 'success'}
+            />
+            <PulseMetric
+              label="Approvals"
+              value={data.pendingApprovals}
+              foot="Waiting on a human"
+              icon={<InboxOutlined />}
+              tone={data.pendingApprovals > 0 ? 'warning' : 'success'}
+            />
+          </div>
+        </Card>
+
+        {data.overdueTasks > 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            message={`${data.overdueTasks} task${data.overdueTasks === 1 ? '' : 's'} past due`}
+            description="Overdue work is still open. Open the task list to see owners and due dates."
+            action={
+              <Link to="/tasks?overdue=true">
+                <Button size="small">Open tasks</Button>
+              </Link>
+            }
+          />
         )}
-      </header>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Stat label="Active projects" value={data.activeProjects} icon={FolderKanban} />
-        <Stat label="People" value={data.totalPeople} icon={Users} />
-        <Stat label="Open tasks" value={data.openTasks} icon={ClipboardList} />
-        <Stat label="Overdue" value={data.overdueTasks} tone={data.overdueTasks > 0 ? 'danger' : 'ok'} icon={AlertTriangle} />
-        <Stat label="Blocked" value={data.blockedTasks} tone={data.blockedTasks > 0 ? 'warn' : 'ok'} icon={Flame} />
-        <Stat label="Approvals waiting" value={data.pendingApprovals} tone={data.pendingApprovals > 0 ? 'warn' : 'ok'} icon={Inbox} />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-5">
-        <Panel title="Projects at a glance" className="xl:col-span-3" action={<Link to="/projects" className="text-[11px] font-semibold text-[var(--color-accent)]">All projects →</Link>}>
-          <div className="space-y-2">
-            {data.projects.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-line)] px-3 py-2">
-                <div className="min-w-0">
-                  <div className="truncate text-[13px] font-semibold">{p.name}</div>
-                  <div className="text-[10px] text-[var(--color-ink-3)]">due {formatDate(p.dueDate)} · {p.openTasks} open · {p.overdueTasks} overdue</div>
-                </div>
-                {healthChip(p.health)}
-              </div>
-            ))}
-            {data.projects.length === 0 && <p className="text-xs text-[var(--color-ink-3)]">No active projects.</p>}
+        <Panel
+          flush
+          title="Needs attention"
+          action={
+            <Link to="/approvals" className="panel-link">
+              Open approvals
+            </Link>
+          }
+        >
+          <div className="attention-strip">
+            <AttentionTile
+              to="/projects"
+              icon={<WarningOutlined />}
+              tone={atRisk.length > 0 ? 'warning' : undefined}
+              title={
+                atRisk.length > 0
+                  ? `${atRisk.length} project${atRisk.length === 1 ? '' : 's'} need attention`
+                  : 'Projects are on track'
+              }
+              description={
+                atRisk.length > 0
+                  ? projectNames + (atRisk.length > 3 ? ` +${atRisk.length - 3} more` : '')
+                  : 'Every active project is reporting on track.'
+              }
+              count={atRisk.length}
+            />
+            <AttentionTile
+              to="/tasks?overdue=true"
+              icon={<ClockCircleOutlined />}
+              tone={data.overdueTasks > 0 ? 'danger' : undefined}
+              title="Overdue tasks"
+              description="Past the due date and still open."
+              count={data.overdueTasks}
+              countTone={data.overdueTasks > 0 ? '#dc2626' : undefined}
+            />
+            <AttentionTile
+              to="/tasks"
+              icon={<StopOutlined />}
+              tone={data.blockedTasks > 0 ? 'warning' : undefined}
+              title="Blocked work"
+              description="Waiting on a dependency or a decision."
+              count={data.blockedTasks}
+            />
+            <AttentionTile
+              to="/approvals"
+              icon={<InboxOutlined />}
+              tone={data.pendingApprovals > 0 ? 'warning' : undefined}
+              title="Approvals waiting on a human"
+              description="Consequential actions never approve themselves."
+              count={data.pendingApprovals}
+            />
+            <AttentionTile
+              to="/agents"
+              icon={<RobotOutlined />}
+              title="Agent runtime"
+              description={live ? `${online} of ${total} agents connected to Switch.` : 'Switch is unreachable; agents are waiting.'}
+              count={live ? `${online}/${total}` : '—'}
+            />
           </div>
         </Panel>
 
-        <Panel title="Next deadlines" className="xl:col-span-2" action={<Link to="/tasks" className="text-[11px] font-semibold text-[var(--color-accent)]">All tasks →</Link>}>
-          <ul className="space-y-2">
-            {data.upcomingDeadlines.slice(0, 6).map((t) => (
-              <li key={t.id} className="flex items-center justify-between gap-3 text-[12px]">
-                <span className="truncate">{t.title}</span>
-                <span className="shrink-0 font-mono text-[10px] text-[var(--color-ink-3)]">{formatDate(t.dueDate)}</span>
-              </li>
-            ))}
-            {data.upcomingDeadlines.length === 0 && <p className="text-xs text-[var(--color-ink-3)]">Nothing dated in the next 7 days.</p>}
-          </ul>
+        <Row gutter={[20, 20]}>
+          <Col xs={24} xl={15}>
+            <Panel
+              flush
+              title="Projects at a glance"
+              action={
+                <Link to="/projects" className="panel-link">
+                  All projects <ArrowRightOutlined style={{ fontSize: 10 }} />
+                </Link>
+              }
+            >
+              <Table
+                rowKey="id"
+                columns={projectColumns}
+                dataSource={data.projects}
+                pagination={false}
+                size="middle"
+                scroll={{ x: 560 }}
+                onRow={() => ({ onClick: () => navigate('/projects'), className: 'clickable-row' })}
+                locale={{ emptyText: 'No active projects.' }}
+              />
+            </Panel>
+          </Col>
+
+          <Col xs={24} xl={9}>
+            <Panel
+              title="Next deadlines"
+              action={
+                <Link to="/tasks" className="panel-link">
+                  All tasks <ArrowRightOutlined style={{ fontSize: 10 }} />
+                </Link>
+              }
+            >
+              <List
+                dataSource={data.upcomingDeadlines.slice(0, 7)}
+                split={false}
+                locale={{ emptyText: 'Nothing dated in the next 7 days.' }}
+                renderItem={(task) => (
+                  <List.Item style={{ padding: '10px 0' }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="cell-primary" style={{ fontWeight: 500 }}>
+                        {task.title}
+                      </div>
+                      <Space size={6} style={{ marginTop: 4 }}>
+                        {statusChip(task.status)}
+                        {priorityChip(task.priority)}
+                      </Space>
+                    </div>
+                    <span className="cell-secondary" style={{ whiteSpace: 'nowrap' }}>
+                      {formatDate(task.dueDate)}
+                    </span>
+                  </List.Item>
+                )}
+              />
+            </Panel>
+          </Col>
+        </Row>
+
+        <Row gutter={[20, 20]}>
+          <Col xs={24} xl={9}>
+            <Panel
+              title="Recent decisions"
+              action={
+                <Link to="/memory" className="panel-link">
+                  Memory <ArrowRightOutlined style={{ fontSize: 10 }} />
+                </Link>
+              }
+            >
+              {data.recentDecisions.length > 0 ? (
+                <Timeline
+                  items={data.recentDecisions.map((decision) => ({
+                    color: '#1677ff',
+                    children: (
+                      <div>
+                        <div className="cell-primary" style={{ fontWeight: 500, lineHeight: 1.45 }}>
+                          {decision.title}
+                        </div>
+                        <div className="cell-secondary" style={{ marginTop: 3 }}>
+                          {formatDate(decision.decidedAt)}
+                          {decision.decidedBy?.length ? ` · ${decision.decidedBy.join(', ')}` : ''}
+                        </div>
+                      </div>
+                    ),
+                  }))}
+                />
+              ) : (
+                <div className="empty-state" style={{ padding: '24px 8px' }}>
+                  <p className="empty-title">No decisions recorded yet.</p>
+                  <p className="empty-hint">Decisions land here when the organization records them in memory.</p>
+                </div>
+              )}
+            </Panel>
+          </Col>
+
+          <Col xs={24} xl={15}>
+            <Panel
+              title="Agent activity"
+              action={
+                <Link to="/agents" className="panel-link">
+                  Agents <ArrowRightOutlined style={{ fontSize: 10 }} />
+                </Link>
+              }
+            >
+              {data.agentActivity.length > 0 ? (
+                <div style={{ maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
+                  {data.agentActivity.slice(0, 10).map((activity) => (
+                    <div className="activity-row" key={activity.id}>
+                      <span className="activity-agent">{activity.agent.replace('agent:', '')}</span>
+                      <div className="activity-copy">
+                        <span className="activity-action">{activity.action.replace(/_/g, ' ')}</span>
+                        <p className="activity-summary">
+                          {activity.outputSummary ?? activity.error ?? 'No summary recorded.'}
+                        </p>
+                      </div>
+                      <div className="activity-side">
+                        <span className="cell-secondary">{timeAgo(activity.at)}</span>
+                        <Space size={4}>
+                          {activity.demo && <Chip tone="neutral">demo</Chip>}
+                          {activity.error && <Chip tone="danger">error</Chip>}
+                        </Space>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state" style={{ padding: '24px 8px' }}>
+                  <p className="empty-title">No agent activity yet.</p>
+                  <p className="empty-hint">The agents appear here once they are working in their Switch room.</p>
+                </div>
+              )}
+            </Panel>
+          </Col>
+        </Row>
+
+        <Panel title="Proactive feed" action={<span className="panel-caption">Delivered by the scheduler</span>}>
+          {data.notifications.length > 0 ? (
+            <List
+              dataSource={data.notifications.slice(0, 6)}
+              split={false}
+              renderItem={(notification) => (
+                <List.Item style={{ padding: '11px 0' }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <Space size={6} style={{ marginBottom: 3 }}>
+                      <Tag
+                        color="blue"
+                        variant="filled"
+                        style={{ marginInlineEnd: 0, fontSize: 10.5, textTransform: 'uppercase' }}
+                      >
+                        {notification.kind}
+                      </Tag>
+                      {notification.demo && <Chip tone="neutral">demo</Chip>}
+                    </Space>
+                    <div className="cell-primary" style={{ fontWeight: 500, lineHeight: 1.5 }}>
+                      {notification.title ?? notification.body}
+                    </div>
+                    {notification.title && <div className="cell-secondary">{notification.body}</div>}
+                  </div>
+                  <span className="cell-secondary" style={{ whiteSpace: 'nowrap' }}>
+                    {timeAgo(notification.at)}
+                  </span>
+                </List.Item>
+              )}
+            />
+          ) : (
+            <div className="empty-state" style={{ padding: '24px 8px' }}>
+              <p className="empty-title">Nothing proactive sent yet.</p>
+              <p className="empty-hint">The scheduler fires at 08:30 in the organization's timezone.</p>
+            </div>
+          )}
         </Panel>
       </div>
-
-      <div className="grid gap-4 xl:grid-cols-5">
-        <Panel title="Recent decisions" className="xl:col-span-2" action={<Link to="/memory" className="text-[11px] font-semibold text-[var(--color-accent)]">Memory →</Link>}>
-          <ul className="space-y-2">
-            {data.recentDecisions.map((d) => (
-              <li key={d.id} className="border-l-2 border-[var(--color-accent)] pl-3">
-                <p className="text-[12px] font-medium leading-snug">{d.title}</p>
-                <p className="mt-0.5 text-[10px] text-[var(--color-ink-3)]">{formatDate(d.decidedAt)}{d.decidedBy?.length ? ` · ${d.decidedBy.join(', ')}` : ''}</p>
-              </li>
-            ))}
-            {data.recentDecisions.length === 0 && <p className="text-xs text-[var(--color-ink-3)]">No decisions recorded yet.</p>}
-          </ul>
-        </Panel>
-
-        <Panel title="Agent activity" className="xl:col-span-3" action={<Link to="/agents" className="text-[11px] font-semibold text-[var(--color-accent)]">Agents →</Link>}>
-          <ul className="scroll-thin max-h-[220px] space-y-0 overflow-y-auto">
-            {data.agentActivity.map((a) => (
-              <li key={a.id} className="flex items-start gap-2 border-b border-[#efede8] py-2 text-[11px] last:border-0">
-                <Bot size={12} className="mt-0.5 shrink-0 text-[var(--color-ink-3)]" />
-                <div className="min-w-0 flex-1">
-                  <span className="font-mono text-[10px] font-semibold text-[var(--color-ink-2)]">{a.agent.replace('agent:', '')}</span>
-                  <span className="text-[var(--color-ink-3)]"> · {a.action}</span>
-                  <p className="truncate text-[11px] text-[var(--color-ink-2)]">{a.outputSummary ?? a.error ?? ''}</p>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="text-[9px] text-[var(--color-ink-3)]">{timeAgo(a.at)}</span>
-                  {a.demo && <Chip tone="neutral">demo</Chip>}
-                </div>
-              </li>
-            ))}
-            {data.agentActivity.length === 0 && <p className="text-xs text-[var(--color-ink-3)]">No agent activity yet — the agents are waiting for their rooms.</p>}
-          </ul>
-        </Panel>
-      </div>
-
-      <Panel title="Proactive feed" action={<span className="text-[10px] text-[var(--color-ink-3)]">delivered by TEAMFORGE's scheduler</span>}>
-        <ul className="space-y-2">
-          {data.notifications.slice(0, 5).map((n) => (
-            <li key={n.id} className="flex items-start justify-between gap-3 rounded-lg bg-[var(--color-paper)] px-3 py-2 text-[11px]">
-              <div className="min-w-0">
-                <span className="font-mono text-[9px] font-semibold uppercase text-[var(--color-ink-3)]">{n.kind}</span>
-                <p className="leading-snug text-[var(--color-ink-2)]">{n.body}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {n.demo && <Chip tone="neutral">demo</Chip>}
-                <span className="text-[9px] text-[var(--color-ink-3)]">{timeAgo(n.at)}</span>
-              </div>
-            </li>
-          ))}
-          {data.notifications.length === 0 && <p className="text-xs text-[var(--color-ink-3)]">Nothing proactive sent yet. The scheduler fires at 08:30 (org timezone).</p>}
-        </ul>
-      </Panel>
-
-      {data.overdueTasks > 0 && (
-        <Link to="/tasks?overdue=true" className="flex items-center gap-2 rounded-xl border border-[var(--color-danger-soft)] bg-[var(--color-danger-soft)] px-4 py-3 text-[12px] font-medium text-[var(--color-danger)]">
-          <CheckCircle2 size={14} /> {data.overdueTasks} overdue task{data.overdueTasks > 1 ? 's' : ''} waiting on humans — open tasks →
-        </Link>
-      )}
-    </div>
+    </>
   );
 }

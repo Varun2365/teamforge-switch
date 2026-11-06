@@ -1,31 +1,111 @@
-import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from 'react';
-import { X } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Alert, Button as AntButton, Card, Drawer as AntDrawer, Empty as AntEmpty, Input, Select, Skeleton, Tag, Typography } from 'antd';
+import type { ButtonProps } from 'antd';
 import { clsx } from '../lib/clsx';
 
-export function Button({ variant = 'primary', className, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'danger' }) {
-  const v = variant === 'primary' ? 'btn-primary' : variant === 'danger' ? 'btn-danger' : 'btn-ghost';
-  return <button className={clsx('btn', v, className)} {...props} />;
+export { Input, Select };
+
+export function Button({ variant = 'primary', ...props }: Omit<ButtonProps, 'variant'> & { variant?: 'primary' | 'ghost' | 'danger' }) {
+  return <AntButton type={variant === 'ghost' ? 'default' : 'primary'} danger={variant === 'danger'} {...props} />;
 }
 
-export const Input = ({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) => <input className={clsx('input', className)} {...props} />;
-export const Select = ({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) => <select className={clsx('input', className)} {...props} />;
-
-export function Panel({ title, action, children, className }: { title?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
+export function PageHeader({
+  title,
+  description,
+  extra,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  extra?: ReactNode;
+}) {
   return (
-    <section className={clsx('panel panel-pad', className)}>
-      {(title || action) && (
-        <div className="mb-3 flex items-center justify-between gap-3">
-          {typeof title === 'string' ? <h2 className="text-[0.82rem] font-semibold uppercase tracking-[0.08em] text-[var(--color-ink-3)]">{title}</h2> : title}
-          {action && <div className="shrink-0">{action}</div>}
-        </div>
-      )}
-      {children}
-    </section>
+    <header className="page-header">
+      <div className="page-header-copy">
+        <Typography.Title level={2} className="page-title">
+          {title}
+        </Typography.Title>
+        {description && (
+          <Typography.Paragraph className="page-description">{description}</Typography.Paragraph>
+        )}
+      </div>
+      {extra && <div className="page-header-extra">{extra}</div>}
+    </header>
   );
 }
 
-export function Chip({ tone = 'neutral', children }: { tone?: 'ok' | 'warn' | 'danger' | 'info' | 'neutral' | 'accent'; children: ReactNode }) {
-  return <span className={clsx('chip', `chip-${tone}`)}>{children}</span>;
+export function Panel({
+  title,
+  action,
+  children,
+  className,
+  flush,
+}: {
+  title?: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  flush?: boolean;
+}) {
+  return (
+    <Card
+      className={clsx('tf-card', flush && 'is-flush', className)}
+      title={title}
+      extra={action}
+      variant="outlined"
+    >
+      {children}
+    </Card>
+  );
+}
+
+const CHIP_TONE: Record<string, string> = {
+  ok: 'success',
+  warn: 'warning',
+  danger: 'error',
+  info: 'blue',
+  neutral: 'default',
+  accent: 'blue',
+};
+
+export function Chip({
+  tone = 'neutral',
+  children,
+}: {
+  tone?: 'ok' | 'warn' | 'danger' | 'info' | 'neutral' | 'accent';
+  children: ReactNode;
+}) {
+  return (
+    <Tag color={CHIP_TONE[tone]} variant="filled" style={{ marginInlineEnd: 0 }}>
+      {children}
+    </Tag>
+  );
+}
+
+const STATUS_TONE: Record<string, 'ok' | 'warn' | 'danger' | 'info' | 'neutral'> = {
+  done: 'ok',
+  completed: 'ok',
+  approved: 'ok',
+  on_track: 'ok',
+  active: 'info',
+  in_progress: 'info',
+  planning: 'neutral',
+  todo: 'neutral',
+  pending: 'warn',
+  at_risk: 'warn',
+  blocked: 'danger',
+  off_track: 'danger',
+  rejected: 'danger',
+  disputed: 'danger',
+  cancelled: 'neutral',
+  superseded: 'neutral',
+};
+
+export function displayLabel(value: string) {
+  return value.replace(/_/g, ' ');
+}
+
+export function statusChip(status: string) {
+  return <Chip tone={STATUS_TONE[status] ?? 'neutral'}>{displayLabel(status)}</Chip>;
 }
 
 export function healthChip(health: string) {
@@ -34,38 +114,37 @@ export function healthChip(health: string) {
   return <Chip tone="danger">Off track</Chip>;
 }
 
-export function statusChip(status: string) {
-  const map: Record<string, 'ok' | 'warn' | 'danger' | 'info' | 'neutral'> = { done: 'ok', in_progress: 'info', todo: 'neutral', blocked: 'danger', cancelled: 'neutral', active: 'info', completed: 'ok', planning: 'neutral', pending: 'warn', approved: 'ok', rejected: 'danger', superseded: 'neutral', disputed: 'danger' };
-  return <Chip tone={map[status] ?? 'neutral'}>{status.replace(/_/g, ' ')}</Chip>;
+export function priorityChip(priority: string) {
+  const tone = priority === 'urgent' ? 'danger' : priority === 'high' ? 'warn' : priority === 'low' ? 'neutral' : 'info';
+  return <Chip tone={tone}>{priority}</Chip>;
 }
 
-export function priorityChip(p: string) {
-  const map: Record<string, 'ok' | 'warn' | 'danger' | 'neutral' | 'info'> = { low: 'neutral', medium: 'info', high: 'warn', urgent: 'danger' };
-  return <Chip tone={map[p] ?? 'neutral'}>{p}</Chip>;
-}
-
-export function Drawer({ title, onClose, children, width = 460 }: { title: ReactNode; onClose: () => void; children: ReactNode; width?: number }) {
+export function Drawer({
+  title,
+  onClose,
+  children,
+  width = 480,
+  extra,
+}: {
+  title: ReactNode;
+  onClose: () => void;
+  children: ReactNode;
+  width?: number;
+  extra?: ReactNode;
+}) {
   return (
-    <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative flex h-full flex-col bg-[var(--color-panel)] shadow-2xl border-l border-[var(--color-line)]" style={{ width }}>
-        <div className="flex items-center justify-between border-b border-[var(--color-line)] px-5 py-4">
-          <div className="text-sm font-semibold">{title}</div>
-          <button className="rounded-md p-1 text-[var(--color-ink-3)] hover:bg-[var(--color-paper)] hover:text-[var(--color-ink)]" onClick={onClose} aria-label="Close">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="scroll-thin flex-1 overflow-y-auto px-5 py-4">{children}</div>
-      </div>
-    </div>
+    <AntDrawer title={title} open onClose={onClose} width={width} extra={extra} destroyOnHidden>
+      {children}
+    </AntDrawer>
   );
 }
 
 export function Empty({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-[var(--color-line)] px-6 py-10 text-center">
-      <p className="text-sm font-medium text-[var(--color-ink-2)]">{title}</p>
-      {hint && <p className="mt-1 text-xs text-[var(--color-ink-3)]">{hint}</p>}
+    <div className="empty-state">
+      <AntEmpty image={AntEmpty.PRESENTED_IMAGE_SIMPLE} description={null} />
+      <p className="empty-title">{title}</p>
+      {hint && <p className="empty-hint">{hint}</p>}
     </div>
   );
 }
@@ -73,30 +152,65 @@ export function Empty({ title, hint }: { title: string; hint?: string }) {
 export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const msg = error instanceof Error ? error.message : String(error);
   return (
-    <div className="rounded-lg border border-[var(--color-danger-soft)] bg-[var(--color-danger-soft)] px-4 py-3 text-xs text-[var(--color-danger)]">
-      <p className="font-semibold">Couldn't load this.</p>
-      <p className="mt-1 opacity-90">{msg}</p>
-      {onRetry && <button className="btn btn-ghost mt-2" onClick={onRetry}>Retry</button>}
-    </div>
+    <Alert
+      type="error"
+      showIcon
+      message="Couldn't load this"
+      description={msg}
+      action={
+        onRetry ? (
+          <AntButton size="small" onClick={onRetry}>
+            Retry
+          </AntButton>
+        ) : undefined
+      }
+    />
   );
 }
 
 export function Spinner() {
   return (
-    <div className="flex items-center justify-center py-10">
-      <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-line)] border-t-[var(--color-accent)]" />
+    <div className="loading-block">
+      <Skeleton active title={false} paragraph={{ rows: 4 }} />
     </div>
   );
+}
+
+export function initials(name?: string | null) {
+  if (!name) return '?';
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 }
 
 export function formatDate(d?: string | Date | null) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
+
 export function formatDateTime(d?: string | Date | null) {
   if (!d) return '—';
-  return new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(d).toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
+
+export function formatLongDate(date = new Date()) {
+  return date.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 export function timeAgo(d?: string | Date | null) {
   if (!d) return '';
   const diff = Date.now() - new Date(d).getTime();

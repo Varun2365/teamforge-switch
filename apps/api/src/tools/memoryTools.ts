@@ -29,7 +29,7 @@ export function registerMemoryTools(reg: ToolRegistry) {
 
   reg.register({
     name: 'find_entity',
-    description: 'Resolve a name to entities with confidence. Use this instead of guessing who "Aaru" or "Priya" is. Returns resolved / ambiguous / no_match with candidates.',
+    description: 'Resolve a name to entities with confidence. Use this instead of guessing which person a nickname refers to. Returns resolved / ambiguous / no_match with candidates.',
     tier: 'read',
     input: z.object({
       name: z.string().min(1),

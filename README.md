@@ -12,14 +12,14 @@ TEAMFORGE is the AI operations desk for a team: it understands the organization,
 |---|---|
 | Six agents registered on the local Switch server (`ops-manager-tf` … `quality-risk-tf`), **6/6 online** | ✅ verified live |
 | Room **`teamforge-lobby`** auto-created on the **Discord bridge** (fresh channel) | ✅ verified live |
-| **No-mention UX**: unaddressed human messages → operations manager; @mentions route to a single specialist; agent chatter never loops | ✅ verified live + unit-tested |
-| Deterministic, tool-grounded brain (status, ownership, overdue/risk, decisions, skills, reminders, commitments) | ✅ 39/39 tests |
+| **No-mention UX**: every human message → the AI ops manager; @mentions route to a single specialist; agent chatter never loops | ✅ verified live + unit-tested |
+| **AI brain via your OpenCode plan** (headless): the model decides retrieval, memory writes, tasks/reminders and wording — no templates, no regex intent routing, no third-party API keys | ✅ verified live (real reply + stored memory) |
+| **Self-growing org memory**: people created from their Discord identity, meetings/decisions/commitments stored with sources by the AI | ✅ verified (event + reminder + person entity from one message) |
+| **No demo data**: bootstrap only creates the organization; the team builds the record by talking | ✅ 173 sample docs removed |
 | Business engine: ~53 tools over MCP `/mcp` + REST, MongoDB `teamforge-ops` (isolated DB) | ✅ |
 | Organizational memory: temporal facts, supersession, aliases, provenance, approvals | ✅ |
-| Persistent scheduler: reminders, morning brief, overdue scans with blast radius, deadline/commitment follow-ups | ✅ live |
+| Persistent scheduler: reminders (@mentions the person in the room), morning brief, overdue scans, deadline/commitment follow-ups | ✅ verified live |
 | Dashboard (9 pages) | ✅ |
-| Proactive posts through the Switch room via the agent runtime | ✅ wired (same deliverProactive path) |
-| Third-party LLM keys | none — by design |
 
 ## Architecture
 
@@ -83,9 +83,11 @@ Then open your Discord server → channel **`teamforge-lobby`** and type anythin
 
 ## Honest notes
 
-- **Switch Console must stay open.** It runs the local Switch server; when it's closed, agents reconnect automatically once it's back.
-- The brain is deterministic and tool-grounded — excellent on operational truth, not a free-form essayist. An optional LLM backend is documented as future work, never required.
-- Agent names carry the `-tf` suffix so this build never hijacks agents from any earlier build on the same server.
-- No silent fake activity: every agent action is logged; failures surface in the room and in the dashboard.
+- **There is no demo data.** `npm run seed` bootstraps the organization and background jobs only. People, projects, tasks and memory come from real conversation; the AI stores them as the team talks.
+- **The AI lives in your OpenCode plan** (headless `opencode run` with the TeamForge MCP server attached). If the CLI is unavailable, the API falls back to a safe offline engine and says so in logs — never fake answers.
+- The first time someone speaks, a teammate record is created from their Discord identity automatically. Introductions ("I'm X, I do Y") become their profile.
+- Reminders are delivered as real room messages that **@mention** the person via Switch targeting.
+- Switch Console must stay open; closing it disconnects agents until it returns.
+- The brain runs with the owner's OpenCode credentials. No model keys are stored in this repo.
 
 Docs: `docs/ARCHITECTURE.md` · `docs/SWITCH_INTEGRATION.md` · `docs/MEMORY_ENGINE.md` · `docs/AGENT_ROLES.md` · `docs/API.md` · `docs/DEMO_GUIDE.md` · build ledger `PHASES.md`.

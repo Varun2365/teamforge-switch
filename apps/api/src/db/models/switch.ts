@@ -41,6 +41,7 @@ const conversationSchema = new Schema(
     title: String,
     participants: [String],
     lastMessageAt: Date,
+    aiSessionId: String,
   },
   { timestamps: true, minimize: false },
 );

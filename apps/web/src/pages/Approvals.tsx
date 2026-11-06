@@ -1,71 +1,178 @@
 import { useState } from 'react';
-import { Check, X, MessageSquareWarning } from 'lucide-react';
+import { App, Button, Input, Popconfirm, Skeleton, Space, Table } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { CheckOutlined, CloseOutlined, WarningOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
-import { useApprovalsPending, useApprovalsAll } from '../lib/hooks';
-import { Panel, Chip, Button, Input, Spinner, ErrorBox, Empty, formatDateTime } from '../components/ui';
+import { api, type Approval } from '../lib/api';
+import { useApprovalsAll, useApprovalsPending } from '../lib/hooks';
+import {
+  Chip,
+  Empty,
+  ErrorBox,
+  PageHeader,
+  Panel,
+  formatDateTime,
+  statusChip,
+} from '../components/ui';
 
 export default function ApprovalsPage() {
   const pending = useApprovalsPending();
   const all = useApprovalsAll();
-  const qc = useQueryClient();
-  const [note, setNote] = useState('');
+  const queryClient = useQueryClient();
+  const { message } = App.useApp();
+  const [notes, setNotes] = useState<Record<string, string>>({});
 
   const resolve = useMutation({
-    mutationFn: ({ id, approve }: { id: string; approve: boolean }) => api(`/api/approvals/${id}/${approve ? 'approve' : 'reject'}`, { method: 'POST', body: JSON.stringify({ note: note || undefined }) }),
-    onSuccess: () => { qc.invalidateQueries(); setNote(''); },
+    mutationFn: ({ id, approve, note }: { id: string; approve: boolean; note?: string }) =>
+      api(`/api/approvals/${id}/${approve ? 'approve' : 'reject'}`, {
+        method: 'POST',
+        body: JSON.stringify({ note: note || undefined }),
+      }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries();
+      message.success(variables.approve ? 'Request approved.' : 'Request rejected.');
+      setNotes((current) => {
+        const next = { ...current };
+        delete next[variables.id];
+        return next;
+      });
+    },
+    onError: (error: Error) => message.error(error.message),
   });
 
+  const pendingCount = pending.data?.length ?? 0;
+
+  const historyColumns: ColumnsType<Approval> = [
+    {
+      title: 'Action',
+      dataIndex: 'action',
+      render: (action: string) => <span className="cell-primary" style={{ fontWeight: 500 }}>{action.replace(/_/g, ' ')}</span>,
+    },
+    { title: 'Requester', dataIndex: 'requesterName', render: (name: string) => <span style={{ color: '#475569' }}>{name}</span> },
+    { title: 'Status', dataIndex: 'status', width: 120, render: (status: string) => statusChip(status) },
+    {
+      title: 'Requested',
+      dataIndex: 'requestedAt',
+      width: 160,
+      render: (value: string) => <span className="cell-secondary" style={{ whiteSpace: 'nowrap' }}>{formatDateTime(value)}</span>,
+    },
+  ];
+
   return (
-    <div className="space-y-4">
-      <header>
-        <h1 className="text-[22px] font-bold tracking-tight">Approvals</h1>
-        <p className="text-[12px] text-[var(--color-ink-2)]">Consequential actions wait here for a human — agents never treat their own recommendation as approval.</p>
-      </header>
+    <>
+      <PageHeader
+        title="Approvals"
+        description="Consequential actions wait here for a human. Agents never treat their own recommendation as approval."
+        extra={
+          <Chip tone={pendingCount > 0 ? 'warn' : 'ok'}>
+            {pendingCount > 0 ? `${pendingCount} pending` : 'Nothing pending'}
+          </Chip>
+        }
+      />
 
-      <Panel title="Waiting on you" action={pending.data?.length ? <Chip tone="warn">{pending.data.length} pending</Chip> : undefined}>
-        {pending.isLoading ? <Spinner /> : pending.isError ? <ErrorBox error={pending.error} onRetry={() => pending.refetch()} /> : (
-          <ul className="space-y-3">
-            {(pending.data ?? []).map((a) => (
-              <li key={a._id} className="rounded-xl border border-[var(--color-warn)] bg-[var(--color-warn-soft)] p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Chip tone="warn">{a.action.replace(/_/g, ' ')}</Chip>
-                  <span className="text-[10px] text-[var(--color-ink-3)]">from {a.requesterName} · {formatDateTime(a.requestedAt)}</span>
-                </div>
-                <p className="mt-2 text-[13px] font-semibold leading-snug">{a.reason}</p>
-                {a.impact && <p className="mt-1 flex items-start gap-1.5 text-[11px] text-[var(--color-ink-2)]"><MessageSquareWarning size={11} className="mt-0.5 shrink-0" />{a.impact}</p>}
-                <div className="mt-3 flex items-center gap-2">
-                  <Input className="max-w-xs" placeholder="Optional note for the audit log…" value={note} onChange={(e) => setNote(e.target.value)} />
-                  <Button onClick={() => resolve.mutate({ id: a._id, approve: true })}><Check size={13} /> Approve</Button>
-                  <Button variant="ghost" onClick={() => resolve.mutate({ id: a._id, approve: false })}><X size={13} /> Reject</Button>
-                </div>
-              </li>
-            ))}
-            {(pending.data?.length ?? 0) === 0 && <Empty title="Nothing waiting." hint="When TEAMFORGE needs a decision — an assignment, a deadline move, an external send — it lands here." />}
-          </ul>
-        )}
-      </Panel>
+      <div className="section-stack">
+        <Panel
+          title="Waiting on you"
+          action={pendingCount > 0 ? <Chip tone="warn">{pendingCount} pending</Chip> : undefined}
+        >
+          {pending.isLoading ? (
+            <Skeleton active paragraph={{ rows: 7 }} />
+          ) : pending.isError ? (
+            <ErrorBox error={pending.error} onRetry={() => pending.refetch()} />
+          ) : pendingCount === 0 ? (
+            <Empty
+              title="Nothing waiting."
+              hint="When TEAMFORGE needs a decision — an assignment, a deadline move, an external send — it lands here with its reason and impact."
+            />
+          ) : (
+            (pending.data ?? []).map((approval) => {
+              const approving = resolve.isPending && resolve.variables?.id === approval._id && resolve.variables?.approve;
+              const rejecting = resolve.isPending && resolve.variables?.id === approval._id && !resolve.variables?.approve;
 
-      <Panel title="Recent history">
-        {all.isLoading ? <Spinner /> : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead><tr><th className="th">Action</th><th className="th">Requester</th><th className="th">Status</th><th className="th">When</th></tr></thead>
-              <tbody>
-                {(all.data ?? []).slice(0, 30).map((a) => (
-                  <tr key={a._id} className="row-hover">
-                    <td className="td font-medium">{a.action.replace(/_/g, ' ')}</td>
-                    <td className="td text-[var(--color-ink-2)]">{a.requesterName}</td>
-                    <td className="td">{a.status === 'approved' ? <Chip tone="ok">approved</Chip> : a.status === 'rejected' ? <Chip tone="danger">rejected</Chip> : <Chip tone="warn">{a.status}</Chip>}</td>
-                    <td className="td font-mono text-[10px] text-[var(--color-ink-3)]">{formatDateTime(a.requestedAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {(all.data?.length ?? 0) === 0 && <Empty title="No approvals yet." />}
-          </div>
-        )}
-      </Panel>
-    </div>
+              return (
+                <div className="approval-item" key={approval._id}>
+                  <div className="approval-top">
+                    <Space size={8} wrap>
+                      <Chip tone="warn">{approval.action.replace(/_/g, ' ')}</Chip>
+                      <span className="cell-secondary">
+                        from {approval.requesterName} · {formatDateTime(approval.requestedAt)}
+                      </span>
+                    </Space>
+                  </div>
+
+                  <div className="approval-reason">{approval.reason}</div>
+
+                  {approval.impact && (
+                    <div className="approval-impact">
+                      <WarningOutlined />
+                      <span>{approval.impact}</span>
+                    </div>
+                  )}
+
+                  <div className="approval-actions">
+                    <Input
+                      placeholder="Optional note for the audit log…"
+                      value={notes[approval._id] ?? ''}
+                      onChange={(event) =>
+                        setNotes((current) => ({ ...current, [approval._id]: event.target.value }))
+                      }
+                      style={{ maxWidth: 320 }}
+                    />
+                    <Button
+                      type="primary"
+                      icon={<CheckOutlined />}
+                      loading={approving}
+                      onClick={() =>
+                        resolve.mutate({
+                          id: approval._id,
+                          approve: true,
+                          note: notes[approval._id],
+                        })
+                      }
+                    >
+                      Approve
+                    </Button>
+                    <Popconfirm
+                      title="Reject this request?"
+                      description="The requester will see the rejection in the audit log."
+                      okText="Reject"
+                      okButtonProps={{ danger: true }}
+                      onConfirm={() =>
+                        resolve.mutate({
+                          id: approval._id,
+                          approve: false,
+                          note: notes[approval._id],
+                        })
+                      }
+                    >
+                      <Button danger icon={<CloseOutlined />} loading={rejecting}>
+                        Reject
+                      </Button>
+                    </Popconfirm>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </Panel>
+
+        <Panel title="Recent history" action={<span className="panel-caption">Last 30 requests</span>}>
+          {all.isLoading ? (
+            <Skeleton active paragraph={{ rows: 7 }} />
+          ) : all.isError ? (
+            <ErrorBox error={all.error} onRetry={() => all.refetch()} />
+          ) : (
+            <Table
+              rowKey="_id"
+              columns={historyColumns}
+              dataSource={(all.data ?? []).slice(0, 30)}
+              pagination={{ pageSize: 10, hideOnSinglePage: true, showSizeChanger: false }}
+              scroll={{ x: 600 }}
+              locale={{ emptyText: 'No approvals yet.' }}
+            />
+          )}
+        </Panel>
+      </div>
+    </>
   );
 }

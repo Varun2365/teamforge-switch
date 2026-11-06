@@ -1,6 +1,6 @@
 # TEAMFORGE — The Six Agents
 
-All six are **always-on custom Switch agent clients** running inside the TEAMFORGE API (the architecture proven in the earlier `D:\WeMakeDevs` build). They differ by role scoping and behaviour — not by separate processes. Shared laws: unaddressed humans go to the operations manager, specialists answer mentions/handoffs, every claim is grounded in tools, consequential actions become approvals, provenance or silence.
+All six are **always-on custom Switch agent clients** running inside the TEAMFORGE API. Every reply is produced by the AI brain (headless OpenCode with the TeamForge MCP server attached); the model retrieves context, writes memory and chooses tools itself. The deterministic engine is an offline fallback only. Shared laws: unaddressed humans go to the operations manager, specialists answer mentions/handoffs, every claim is grounded in tools, consequential actions become approvals, provenance or silence.
 
 | Agent | Registered name | Voice | Tools it leans on |
 |---|---|---|---|
@@ -22,7 +22,7 @@ All six are **always-on custom Switch agent clients** running inside the TEAMFOR
 
 ## Humanized output — how it's enforced
 
-- The voice rules live in the brain's composition (first names, contractions, short sentences, no "Sure!/Certainly!", one question at a time, numbers over adjectives, honest uncertainty) and in the shared `deRoboticize()` post-pass applied to every reply.
+- The voice rules are in the AI prompt (first names, contractions, short sentences, warm colleague tone, no tool talk, no invented org facts, one question when needed) plus the shared `deRoboticize()` post-pass applied to every reply.
 - `switch/agent-instructions/*.md` remains the canonical voice/role specification and is kept in sync with behaviour.
 - Scheduler copy (morning brief, overdue nudges) follows the same rules.
 

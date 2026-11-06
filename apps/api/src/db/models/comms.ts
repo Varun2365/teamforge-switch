@@ -43,7 +43,7 @@ const notificationSchema = baseSchema({
   deliveredVia: String, // 'switch' | 'console' | 'api'
   at: { type: Date, default: Date.now },
 });
-notificationSchema.index({ orgId: 1, dedupeKey: 1 }, { unique: true, sparse: true });
+notificationSchema.index({ orgId: 1, dedupeKey: 1 }, { unique: true, partialFilterExpression: { dedupeKey: { $type: 'string' } } });
 export type NotificationDoc = InferSchemaType<typeof notificationSchema> & { _id: string };
 export const NotificationModel = (mongoose.models.Notification as Model<NotificationDoc>) ?? model<NotificationDoc>('Notification', notificationSchema);
 
@@ -81,7 +81,7 @@ const reminderSchema = baseSchema({
   quietHoursOverride: { type: Boolean, default: false },
   metadata: mixed,
 });
-reminderSchema.index({ orgId: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
+reminderSchema.index({ orgId: 1, idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } });
 export type Reminder = InferSchemaType<typeof reminderSchema> & { _id: string };
 export const ReminderModel = (mongoose.models.Reminder as Model<Reminder>) ?? model<Reminder>('Reminder', reminderSchema);
 
@@ -101,7 +101,7 @@ const scheduledJobSchema = baseSchema({
   idempotencyKey: { type: String, index: true },
   lastError: String,
 });
-scheduledJobSchema.index({ orgId: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
+scheduledJobSchema.index({ orgId: 1, idempotencyKey: 1 }, { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } });
 scheduledJobSchema.index({ status: 1, runAt: 1 });
 export type ScheduledJob = InferSchemaType<typeof scheduledJobSchema> & { _id: string };
 export const ScheduledJobModel = (mongoose.models.ScheduledJob as Model<ScheduledJob>) ?? model<ScheduledJob>('ScheduledJob', scheduledJobSchema);

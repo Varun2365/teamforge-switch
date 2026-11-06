@@ -291,7 +291,7 @@ async function knowledgeReply(message: AgentMessage, use: (n: string, i?: Record
   const memory = await use('search_organization_memory', { query: body, limit: 5 });
   const hints: string[] = memory?.answerHints ?? [];
   if (hints.length) return `Here's what the org knows, ${name}:\n${hints.map((h: string) => `• ${h}`).join('\n')}`;
-  return `Memory's quiet on that one. If you state it plainly — "we decided X", "Aarav owns Y as of today" — I'll store it with its source, permanently retrievable.`;
+  return `Memory is quiet on that, so I have nothing reliable to go on yet. Tell me the fact plainly and I will store it with its source so it stays retrievable.`;
 }
 
 /* ───────── Communication ───────── */

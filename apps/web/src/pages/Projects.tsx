@@ -1,97 +1,316 @@
 import { useState } from 'react';
-import { Calendar, Flag, ChevronRight, Users } from 'lucide-react';
-import { useProjects, useProject } from '../lib/hooks';
-import { Panel, Chip, Drawer, Spinner, ErrorBox, Empty, healthChip, statusChip, formatDate } from '../components/ui';
+import { Avatar, Card, Col, List, Progress, Row, Segmented, Skeleton, Space, Tag, Timeline } from 'antd';
+import {
+  CalendarOutlined,
+  FlagOutlined,
+  RightOutlined,
+  TeamOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
+import { useProject, useProjects } from '../lib/hooks';
+import {
+  Drawer,
+  Empty,
+  ErrorBox,
+  PageHeader,
+  Panel,
+  formatDate,
+  healthChip,
+  initials,
+  statusChip,
+} from '../components/ui';
+
+type ProjectFilter = 'all' | 'at_risk' | 'on_track';
 
 export default function ProjectsPage() {
   const { data: projects, isLoading, isError, error, refetch } = useProjects();
+  const [filter, setFilter] = useState<ProjectFilter>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const detail = useProject(selectedId ?? '');
 
-  return (
-    <div className="space-y-4">
-      <header>
-        <h1 className="text-[22px] font-bold tracking-tight">Projects</h1>
-        <p className="text-[12px] text-[var(--color-ink-2)]">Health computed from real task data — overdue, blocked and ownership, never vibes.</p>
-      </header>
+  const filtered = (projects ?? []).filter((project) => {
+    if (filter === 'all') return true;
+    if (filter === 'on_track') return project.health === 'on_track';
+    return project.health !== 'on_track';
+  });
 
-      {isLoading ? <Spinner /> : isError ? <ErrorBox error={error} onRetry={() => refetch()} /> : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {(projects ?? []).map((p) => (
-            <button key={p.id} onClick={() => setSelectedId(p.id)} className="panel panel-pad text-left transition hover:border-[var(--color-accent)]">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="truncate text-[14px] font-bold">{p.name}</h2>
-                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[var(--color-ink-2)]">{p.description}</p>
-                </div>
-                {healthChip(p.health)}
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-[var(--color-ink-3)]">
-                <span className="flex items-center gap-1"><Flag size={10} />{p.category}</span>
-                <span className="flex items-center gap-1"><Calendar size={10} />due {formatDate(p.dueDate)}</span>
-                {statusChip(p.status)}
-              </div>
-            </button>
+  const atRiskCount = (projects ?? []).filter((project) => project.health !== 'on_track').length;
+
+  return (
+    <>
+      <PageHeader
+        title="Projects"
+        description="Health is computed from real task data — overdue work, blocked work and ownership, never vibes."
+        extra={
+          <Space size={10} wrap>
+            <Tag variant="filled" style={{ marginInlineEnd: 0 }}>
+              {projects?.length ?? 0} active
+            </Tag>
+            {atRiskCount > 0 && (
+              <Tag color="warning" variant="filled" style={{ marginInlineEnd: 0 }}>
+                {atRiskCount} need attention
+              </Tag>
+            )}
+            <Segmented
+              value={filter}
+              onChange={(value) => setFilter(value as ProjectFilter)}
+              options={[
+                { label: 'All', value: 'all' },
+                { label: 'At risk', value: 'at_risk' },
+                { label: 'On track', value: 'on_track' },
+              ]}
+            />
+          </Space>
+        }
+      />
+
+      {isLoading ? (
+        <Row gutter={[16, 16]}>
+          {[0, 1, 2, 3].map((key) => (
+            <Col xs={24} xl={12} key={key}>
+              <Card className="tf-card">
+                <Skeleton active paragraph={{ rows: 3 }} />
+              </Card>
+            </Col>
           ))}
-          {(projects ?? []).length === 0 && <Empty title="No projects yet." hint="Say 'we're launching X by Y' in a room — TEAMFORGE will track it here." />}
-        </div>
+        </Row>
+      ) : isError ? (
+        <ErrorBox error={error} onRetry={() => refetch()} />
+      ) : filtered.length === 0 ? (
+        <Panel>
+          <Empty
+            title="No projects in this view."
+            hint="Try another filter, or say “we're launching X by Y” in a room and TEAMFORGE will track it here."
+          />
+        </Panel>
+      ) : (
+        <Row gutter={[16, 16]}>
+          {filtered.map((project) => {
+            const total = project.stats?.totalTasks ?? 0;
+            const done = project.stats?.doneTasks ?? 0;
+            const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+
+            return (
+              <Col xs={24} xl={12} key={project.id}>
+                <Card
+                  className="tf-card"
+                  hoverable
+                  onClick={() => setSelectedId(project.id)}
+                  styles={{ body: { padding: 20 } }}
+                  style={{ height: '100%' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <h2 className="detail-title" style={{ fontSize: 15.5 }}>
+                        {project.name}
+                      </h2>
+                      <p
+                        className="cell-secondary"
+                        style={{
+                          margin: '4px 0 0',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {project.description ?? 'No description recorded.'}
+                      </p>
+                    </div>
+                    {healthChip(project.health)}
+                  </div>
+
+                  <Space size={6} wrap style={{ marginTop: 12 }}>
+                    <Tag variant="filled" style={{ marginInlineEnd: 0 }}>
+                      <FlagOutlined style={{ marginInlineEnd: 4 }} />
+                      {project.category}
+                    </Tag>
+                    <Tag variant="filled" style={{ marginInlineEnd: 0 }}>
+                      <CalendarOutlined style={{ marginInlineEnd: 4 }} />
+                      {formatDate(project.dueDate)}
+                    </Tag>
+                    {statusChip(project.status)}
+                  </Space>
+
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span className="cell-secondary">Task progress</span>
+                      <span className="cell-secondary">
+                        {done}/{total} done
+                      </span>
+                    </div>
+                    <Progress
+                      percent={percent}
+                      showInfo={false}
+                      size="small"
+                      strokeColor={project.health === 'on_track' ? '#1677ff' : project.health === 'at_risk' ? '#d97706' : '#dc2626'}
+                      trailColor="#eef2f7"
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      marginTop: 12,
+                      paddingTop: 12,
+                      borderTop: '1px solid #eef2f7',
+                      fontSize: 11.5,
+                      color: '#8a97a8',
+                    }}
+                  >
+                    <span>
+                      {project.stats?.openTasks ?? 0} open · {project.stats?.overdueTasks ?? 0} overdue ·{' '}
+                      {project.stats?.blockedTasks ?? 0} blocked
+                    </span>
+                    <RightOutlined style={{ fontSize: 10 }} />
+                  </div>
+                </Card>
+              </Col>
+            );
+          })}
+        </Row>
       )}
 
       {selectedId && (
-        <Drawer title={detail.data?.name ?? 'Project'} onClose={() => setSelectedId(null)} width={520}>
-          {detail.isLoading ? <Spinner /> : detail.isError ? <ErrorBox error={detail.error} /> : detail.data ? (
-            <div className="space-y-5">
+        <Drawer title="Project detail" onClose={() => setSelectedId(null)} width={560}>
+          {detail.isLoading ? (
+            <Skeleton active paragraph={{ rows: 10 }} />
+          ) : detail.isError ? (
+            <ErrorBox error={detail.error} onRetry={() => detail.refetch()} />
+          ) : detail.data ? (
+            <div className="section-stack" style={{ gap: 22 }}>
               <div>
-                {healthChip(detail.data.health)}
-                <p className="mt-2 text-[12px] leading-snug text-[var(--color-ink-2)]">{detail.data.description}</p>
-                <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-[var(--color-ink-3)]">
-                  <span>Owner: {detail.data.owner?.name ?? 'unassigned'}</span>
-                  <span>·</span>
-                  <span>Due {formatDate(detail.data.dueDate)}</span>
-                  <span>·</span>
-                  <span>{detail.data.stats?.doneTasks ?? 0}/{detail.data.stats?.totalTasks ?? 0} tasks done</span>
+                <Space size={8} wrap>
+                  {healthChip(detail.data.health)}
+                  {statusChip(detail.data.status)}
+                  <Tag variant="filled" style={{ marginInlineEnd: 0 }}>
+                    {detail.data.category}
+                  </Tag>
+                </Space>
+                <h2 className="detail-title" style={{ marginTop: 10 }}>
+                  {detail.data.name}
+                </h2>
+                {detail.data.description && (
+                  <p className="detail-subtitle" style={{ marginTop: 6 }}>
+                    {detail.data.description}
+                  </p>
+                )}
+                <div className="detail-meta">
+                  <span>
+                    <UserOutlined />
+                    Owner: {detail.data.owner?.name ?? 'Unassigned'}
+                  </span>
+                  <span>
+                    <CalendarOutlined />
+                    Due {formatDate(detail.data.dueDate)}
+                  </span>
+                  <span>
+                    <TeamOutlined />
+                    {detail.data.members?.length ?? 0} members
+                  </span>
                 </div>
               </div>
 
               <section>
-                <h3 className="stat-label mb-1.5">Task load</h3>
-                <div className="grid grid-cols-4 gap-2 text-center">
-                  {[['Open', detail.data.stats?.openTasks ?? 0], ['Done', detail.data.stats?.doneTasks ?? 0], ['Overdue', detail.data.stats?.overdueTasks ?? 0], ['Blocked', detail.data.stats?.blockedTasks ?? 0]].map(([l, v]) => (
-                    <div key={String(l)} className="rounded-lg bg-[var(--color-paper)] px-2 py-2">
-                      <div className="text-[16px] font-bold">{v}</div>
-                      <div className="text-[9px] uppercase tracking-wide text-[var(--color-ink-3)]">{l}</div>
+                <span className="section-label">Task load</span>
+                <div className="mini-stats">
+                  {[
+                    { label: 'Open', value: detail.data.stats?.openTasks ?? 0, tone: undefined },
+                    { label: 'Done', value: detail.data.stats?.doneTasks ?? 0, tone: undefined },
+                    { label: 'Overdue', value: detail.data.stats?.overdueTasks ?? 0, tone: '#dc2626' },
+                    { label: 'Blocked', value: detail.data.stats?.blockedTasks ?? 0, tone: '#d97706' },
+                  ].map((stat) => (
+                    <div className="mini-stat" key={stat.label}>
+                      <div className="mini-stat-value" style={stat.value > 0 && stat.tone ? { color: stat.tone } : undefined}>
+                        {stat.value}
+                      </div>
+                      <div className="mini-stat-label">{stat.label}</div>
                     </div>
                   ))}
+                </div>
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span className="cell-secondary">Completion</span>
+                    <span className="cell-secondary">
+                      {detail.data.stats?.doneTasks ?? 0}/{detail.data.stats?.totalTasks ?? 0} tasks
+                    </span>
+                  </div>
+                  <Progress
+                    percent={
+                      (detail.data.stats?.totalTasks ?? 0) > 0
+                        ? Math.round(((detail.data.stats?.doneTasks ?? 0) / (detail.data.stats?.totalTasks ?? 1)) * 100)
+                        : 0
+                    }
+                    showInfo={false}
+                    size="small"
+                    strokeColor="#1677ff"
+                    trailColor="#eef2f7"
+                  />
                 </div>
               </section>
 
               <section>
-                <h3 className="stat-label mb-1.5">Milestones</h3>
-                <ul className="space-y-1.5">
-                  {(detail.data.milestones ?? []).map((m) => (
-                    <li key={m._id} className="flex items-center justify-between rounded-md border border-[var(--color-line)] px-2.5 py-1.5 text-[11px]">
-                      <span className="font-medium">{m.name}</span>
-                      <span className="flex items-center gap-2">{statusChip(m.status)}<span className="font-mono text-[9px] text-[var(--color-ink-3)]">{formatDate(m.dueDate)}</span></span>
-                    </li>
-                  ))}
-                </ul>
+                <span className="section-label">Milestones</span>
+                {(detail.data.milestones ?? []).length > 0 ? (
+                  <Timeline
+                    items={(detail.data.milestones ?? []).map((milestone) => ({
+                      color: milestone.status === 'done' ? '#16a34a' : milestone.status === 'blocked' ? '#dc2626' : '#1677ff',
+                      children: (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                          <div>
+                            <div className="cell-primary" style={{ fontWeight: 500 }}>
+                              {milestone.name}
+                            </div>
+                            <div className="cell-secondary">{formatDate(milestone.dueDate)}</div>
+                          </div>
+                          {statusChip(milestone.status)}
+                        </div>
+                      ),
+                    }))}
+                  />
+                ) : (
+                  <p className="muted" style={{ fontSize: 12 }}>
+                    No milestones recorded.
+                  </p>
+                )}
               </section>
 
               <section>
-                <h3 className="stat-label mb-1.5">Members</h3>
-                <ul className="space-y-1.5">
-                  {(detail.data.members ?? []).map((m) => (
-                    <li key={m.userId} className="flex items-center justify-between text-[11px]">
-                      <span className="flex items-center gap-1.5"><Users size={11} className="text-[var(--color-ink-3)]" />{m.name}</span>
-                      <Chip tone={m.role === 'lead' ? 'accent' : 'neutral'}>{m.role}</Chip>
-                    </li>
-                  ))}
-                </ul>
+                <span className="section-label">Members</span>
+                {(detail.data.members ?? []).length > 0 ? (
+                  <List
+                    dataSource={detail.data.members}
+                    split={false}
+                    renderItem={(member) => (
+                      <List.Item style={{ padding: '7px 0' }}>
+                        <Space size={9}>
+                          <Avatar size={26} style={{ background: '#eef5ff', color: '#1677ff', fontSize: 10, fontWeight: 600 }}>
+                            {initials(member.name)}
+                          </Avatar>
+                          <span className="cell-primary" style={{ fontWeight: 500 }}>
+                            {member.name}
+                          </span>
+                        </Space>
+                        <Tag color={member.role === 'lead' ? 'blue' : 'default'} variant="filled" style={{ marginInlineEnd: 0 }}>
+                          {member.role}
+                        </Tag>
+                      </List.Item>
+                    )}
+                  />
+                ) : (
+                  <p className="muted" style={{ fontSize: 12 }}>
+                    No members recorded.
+                  </p>
+                )}
               </section>
             </div>
           ) : null}
         </Drawer>
       )}
-    </div>
+    </>
   );
 }

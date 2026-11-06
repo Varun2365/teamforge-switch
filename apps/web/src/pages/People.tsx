@@ -1,116 +1,248 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Search, MapPin, Mail, ChevronRight } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Avatar, Input, List, Skeleton, Space, Table, Tag } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import {
+  EnvironmentOutlined,
+  MailOutlined,
+  RightOutlined,
+  SearchOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
 import { usePeople, usePerson } from '../lib/hooks';
-import { Panel, Chip, Input, Drawer, Spinner, ErrorBox, Empty, formatDate, statusChip } from '../components/ui';
+import type { Person } from '../lib/api';
+import {
+  Drawer,
+  ErrorBox,
+  PageHeader,
+  Panel,
+  Spinner,
+  formatDate,
+  initials,
+  statusChip,
+} from '../components/ui';
 
 export default function PeoplePage() {
-  const [q, setQ] = useState('');
+  const [query, setQuery] = useState('');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const people = usePeople(q || undefined);
+  const people = usePeople(query || undefined);
   const person = usePerson(id ?? '');
 
-  return (
-    <div className="space-y-4">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[22px] font-bold tracking-tight">People</h1>
-          <p className="text-[12px] text-[var(--color-ink-2)]">Skills, load and relationships — straight from organizational memory.</p>
-        </div>
-        <div className="relative w-64">
-          <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ink-3)]" />
-          <Input className="pl-8" placeholder="Search people, titles…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-        </div>
-      </header>
-
-      <Panel>
-        {people.isLoading ? <Spinner /> : people.isError ? <ErrorBox error={people.error} onRetry={() => people.refetch()} /> : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr><th className="th">Name</th><th className="th">Title</th><th className="th">Department</th><th className="th">Role</th><th className="th">Active</th><th className="th"></th></tr>
-              </thead>
-              <tbody>
-                {(people.data ?? []).map((p) => (
-                  <tr key={p.id} className="row-hover cursor-pointer" onClick={() => navigate(`/people/${p.id}`)}>
-                    <td className="td">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[10px] font-bold text-[var(--color-accent)]">
-                          {p.name.split(' ').map((w) => w[0]).slice(0, 2).join('')}
-                        </div>
-                        <span className="font-semibold">{p.name}</span>
-                      </div>
-                    </td>
-                    <td className="td text-[var(--color-ink-2)]">{p.title ?? '—'}</td>
-                    <td className="td text-[var(--color-ink-2)]">{p.department ?? '—'}</td>
-                    <td className="td"><Chip tone={p.role === 'owner' ? 'accent' : 'neutral'}>{p.role}</Chip></td>
-                    <td className="td font-mono text-[12px]">{p.activeAssignments}</td>
-                    <td className="td text-right"><ChevronRight size={14} className="ml-auto text-[var(--color-ink-3)]" /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {(people.data?.length ?? 0) === 0 && <Empty title="No people match that." hint="Try a shorter search." />}
+  const columns: ColumnsType<Person> = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      render: (name: string, record) => (
+        <div className="name-cell">
+          <Avatar size={30} style={{ background: '#eef5ff', color: '#1677ff', fontSize: 11, fontWeight: 600 }}>
+            {initials(name)}
+          </Avatar>
+          <div className="name-cell-copy">
+            <div className="cell-primary">{name}</div>
+            {record.email && <div className="cell-secondary">{record.email}</div>}
           </div>
-        )}
-      </Panel>
+        </div>
+      ),
+    },
+    {
+      title: 'Title',
+      dataIndex: 'title',
+      render: (title: string | null) => <span style={{ color: '#475569' }}>{title ?? '—'}</span>,
+    },
+    {
+      title: 'Department',
+      dataIndex: 'department',
+      render: (department: string | null) => <span style={{ color: '#475569' }}>{department ?? '—'}</span>,
+    },
+    {
+      title: 'Role',
+      dataIndex: 'role',
+      width: 110,
+      render: (role: string) => (
+        <Tag color={role === 'owner' ? 'blue' : 'default'} variant="filled" style={{ marginInlineEnd: 0 }}>
+          {role}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Active work',
+      dataIndex: 'activeAssignments',
+      width: 110,
+      align: 'right',
+      render: (value: number) => <span className="number-cell">{value}</span>,
+    },
+    {
+      title: '',
+      width: 40,
+      render: () => <RightOutlined style={{ fontSize: 10, color: '#8a97a8' }} />,
+    },
+  ];
+
+  return (
+    <>
+      <PageHeader
+        title="People"
+        description="The directory behind the work: roles, departments, skills and current load, sourced from organizational memory."
+        extra={
+          <Space size={10}>
+            <Tag variant="filled" style={{ marginInlineEnd: 0 }}>
+              <TeamOutlined style={{ marginInlineEnd: 5 }} />
+              {people.data?.length ?? 0} {people.data?.length === 1 ? 'person' : 'people'}
+            </Tag>
+            <Input
+              allowClear
+              prefix={<SearchOutlined style={{ color: '#8a97a8' }} />}
+              placeholder="Search people, titles…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              style={{ width: 280 }}
+              autoFocus
+            />
+          </Space>
+        }
+      />
+
+      {people.isError ? (
+        <ErrorBox error={people.error} onRetry={() => people.refetch()} />
+      ) : (
+        <Panel flush>
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={people.data ?? []}
+            loading={people.isLoading}
+            pagination={{ pageSize: 14, hideOnSinglePage: true, showSizeChanger: false }}
+            scroll={{ x: 760 }}
+            onRow={(record) => ({
+              onClick: () => navigate(`/people/${record.id}`),
+              className: 'clickable-row',
+            })}
+            locale={{ emptyText: 'No people match that search.' }}
+          />
+        </Panel>
+      )}
 
       {id && (
-        <Drawer title={person.data?.name ?? 'Person'} onClose={() => navigate('/people')} width={480}>
-          {person.isLoading ? <Spinner /> : person.isError ? <ErrorBox error={person.error} /> : person.data ? (
-            <div className="space-y-5">
-              <div>
-                <div className="text-lg font-bold">{person.data.name}</div>
-                <div className="text-[12px] text-[var(--color-ink-2)]">{person.data.title}</div>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[var(--color-ink-3)]">
-                  {person.data.email && <span className="flex items-center gap-1"><Mail size={11} />{person.data.email}</span>}
-                  {person.data.location && <span className="flex items-center gap-1"><MapPin size={11} />{person.data.location}</span>}
-                  {person.data.joinedAt && <span>Joined {formatDate(person.data.joinedAt)}</span>}
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <Chip tone="accent">{person.data.role}</Chip>
-                  {person.data.department && <Chip tone="neutral">{person.data.department.name}</Chip>}
-                  {person.data.reportsTo && <Chip tone="neutral">Reports to {person.data.reportsTo.name}</Chip>}
+        <Drawer title="Person profile" onClose={() => navigate('/people')} width={500}>
+          {person.isLoading ? (
+            <Skeleton active avatar paragraph={{ rows: 7 }} />
+          ) : person.isError ? (
+            <ErrorBox error={person.error} onRetry={() => person.refetch()} />
+          ) : person.data ? (
+            <div className="section-stack" style={{ gap: 22 }}>
+              <div className="detail-head">
+                <Avatar size={54} style={{ background: '#eef5ff', color: '#1677ff', fontSize: 18, fontWeight: 600 }}>
+                  {initials(person.data.name)}
+                </Avatar>
+                <div className="detail-head-copy">
+                  <h2 className="detail-title">{person.data.name}</h2>
+                  <div className="detail-subtitle">{person.data.title ?? 'No title recorded'}</div>
+                  <div className="detail-meta">
+                    {person.data.email && (
+                      <span>
+                        <MailOutlined />
+                        {person.data.email}
+                      </span>
+                    )}
+                    {person.data.location && (
+                      <span>
+                        <EnvironmentOutlined />
+                        {person.data.location}
+                      </span>
+                    )}
+                    {person.data.joinedAt && <span>Joined {formatDate(person.data.joinedAt)}</span>}
+                  </div>
                 </div>
               </div>
 
+              <Space size={6} wrap>
+                <Tag color="blue" variant="filled" style={{ marginInlineEnd: 0 }}>
+                  {person.data.role}
+                </Tag>
+                {person.data.department && (
+                  <Tag variant="filled" style={{ marginInlineEnd: 0 }}>
+                    {person.data.department.name}
+                  </Tag>
+                )}
+                {person.data.reportsTo && (
+                  <Tag variant="filled" style={{ marginInlineEnd: 0 }}>
+                    Reports to {person.data.reportsTo.name}
+                  </Tag>
+                )}
+              </Space>
+
               <section>
-                <h3 className="stat-label mb-2">Skills</h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {person.data.skills.map((s) => (
-                    <span key={s.name} className="rounded-full border border-[var(--color-line)] bg-[var(--color-paper)] px-2.5 py-1 text-[11px]">
-                      {s.name} <span className="font-mono text-[9px] text-[var(--color-ink-3)]">L{s.level}</span>
-                    </span>
+                <span className="section-label">Skills</span>
+                {person.data.skills.length > 0 ? (
+                  <Space size={6} wrap>
+                    {person.data.skills.map((skill) => (
+                      <Tag key={skill.name} className="skill-tag" variant="filled">
+                        {skill.name}
+                        <span className="mono" style={{ marginLeft: 6, color: '#8a97a8' }}>
+                          L{skill.level}
+                        </span>
+                      </Tag>
+                    ))}
+                  </Space>
+                ) : (
+                  <p className="muted" style={{ fontSize: 12 }}>
+                    No skills recorded yet.
+                  </p>
+                )}
+              </section>
+
+              <section>
+                <span className="section-label">Workload · {person.data.workload.capacityNote}</span>
+                <div className="mini-stats">
+                  {[
+                    { label: 'Active', value: person.data.workload.activeAssignments, tone: undefined },
+                    { label: 'In progress', value: person.data.workload.inProgress, tone: undefined },
+                    { label: 'Blocked', value: person.data.workload.blocked, tone: '#d97706' },
+                    { label: 'Overdue', value: person.data.workload.overdue, tone: '#dc2626' },
+                  ].map((stat) => (
+                    <div className="mini-stat" key={stat.label}>
+                      <div className="mini-stat-value" style={stat.value > 0 && stat.tone ? { color: stat.tone } : undefined}>
+                        {stat.value}
+                      </div>
+                      <div className="mini-stat-label">{stat.label}</div>
+                    </div>
                   ))}
-                  {person.data.skills.length === 0 && <p className="text-xs text-[var(--color-ink-3)]">No skills recorded yet.</p>}
                 </div>
               </section>
 
               <section>
-                <h3 className="stat-label mb-2">Workload — {person.data.workload.capacityNote}</h3>
-                <div className="mb-2 grid grid-cols-4 gap-2 text-center">
-                  {[['Active', person.data.workload.activeAssignments], ['In progress', person.data.workload.inProgress], ['Blocked', person.data.workload.blocked], ['Overdue', person.data.workload.overdue]].map(([l, v]) => (
-                    <div key={String(l)} className="rounded-lg bg-[var(--color-paper)] px-2 py-2">
-                      <div className="text-[16px] font-bold">{v}</div>
-                      <div className="text-[9px] uppercase tracking-wide text-[var(--color-ink-3)]">{l}</div>
-                    </div>
-                  ))}
-                </div>
-                <ul className="space-y-1.5">
-                  {person.data.workload.tasks.map((t) => (
-                    <li key={t.id} className="flex items-center justify-between gap-2 rounded-md border border-[var(--color-line)] px-2 py-1.5 text-[11px]">
-                      <span className="truncate">{t.title}</span>
-                      <span className="flex shrink-0 items-center gap-2">{statusChip(t.status)}<span className="font-mono text-[9px] text-[var(--color-ink-3)]">{formatDate(t.dueDate)}</span></span>
-                    </li>
-                  ))}
-                  {person.data.workload.tasks.length === 0 && <p className="text-xs text-[var(--color-ink-3)]">Nothing on their plate.</p>}
-                </ul>
+                <span className="section-label">Assigned work</span>
+                {person.data.workload.tasks.length > 0 ? (
+                  <List
+                    dataSource={person.data.workload.tasks}
+                    split={false}
+                    renderItem={(task) => (
+                      <List.Item style={{ padding: '9px 0' }}>
+                        <span className="cell-primary" style={{ minWidth: 0, flex: 1, fontWeight: 500 }}>
+                          {task.title}
+                        </span>
+                        <Space size={8}>
+                          {statusChip(task.status)}
+                          <span className="cell-secondary" style={{ whiteSpace: 'nowrap' }}>
+                            {formatDate(task.dueDate)}
+                          </span>
+                        </Space>
+                      </List.Item>
+                    )}
+                  />
+                ) : (
+                  <p className="muted" style={{ fontSize: 12 }}>
+                    Nothing on their plate.
+                  </p>
+                )}
               </section>
             </div>
-          ) : null}
+          ) : (
+            <Spinner />
+          )}
         </Drawer>
       )}
-    </div>
+    </>
   );
 }

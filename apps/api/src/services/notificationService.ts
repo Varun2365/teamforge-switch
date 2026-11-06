@@ -93,12 +93,26 @@ export async function deliverNotification(input: DeliverInput): Promise<DeliverR
     return { status: 'queued_dashboard', reason: 'Switch runtime offline — recorded on the dashboard instead (not pretending it posted)', notificationId: record._id };
   }
 
-  // user-target notifications stay on the dashboard feed (no per-user DM channels modelled)
-  await NotificationModel.updateOne({ _id: record._id }, { $set: { status: 'sent', sentAt: new Date(), deliveredVia: 'dashboard' } });
-  await logAgentAction(orgId, input.source ?? 'scheduler', 'proactive_post', { detail: { kind: input.kind, target: input.targetId }, outputSummary: input.body.slice(0, 200), demo: trackDemo() });
-  return { status: 'sent', notificationId: record._id };
-}
+  // user-target notifications: @mention the person in the live room when possible
+  if (input.targetType === 'user') {
+    const { getSwitchRuntime } = await import('../integrations/switch/runtime.js');
+    const { UserModel } = await import('../db/models/org.js');
+    const runtime = getSwitchRuntime();
+    if (runtime?.getStatus().running && runtime.getStatus().onlineAgents > 0) {
+      const user = await UserModel.findOne({ orgId, _id: input.targetId }).lean();
+      const res = await runtime.deliverProactive({ title: input.title ?? input.kind ?? 'Reminder', body: input.body, mentionUserIds: user ? [String(user._id)] : undefined });
+      if (res.ok) {
+        await NotificationModel.updateOne({ _id: record._id }, { $set: { status: 'sent', sentAt: new Date(), deliveredVia: 'switch' } });
+        await logAgentAction(orgId, input.source ?? 'scheduler', 'proactive_post', { detail: { kind: input.kind, target: input.targetId }, outputSummary: input.body.slice(0, 200) });
+        return { status: 'sent', notificationId: record._id };
+      }
+      await NotificationModel.updateOne({ _id: record._id }, { $set: { status: 'failed', error: res.error } });
+      return { status: 'failed', reason: res.error, notificationId: record._id };
+    }
+    await NotificationModel.updateOne({ _id: record._id }, { $set: { status: 'sent', sentAt: new Date(), deliveredVia: 'dashboard', demo: true } });
+    await logAgentAction(orgId, input.source ?? 'scheduler', 'proactive_post', { detail: { kind: input.kind, target: input.targetId }, outputSummary: input.body.slice(0, 200), demo: true });
+    return { status: 'sent', notificationId: record._id };
+  }
 
-function trackDemo(): boolean {
-  return config.TEAMFORGE_DEMO_MODE;
+  return { status: 'failed', reason: 'unsupported target', notificationId: record._id };
 }

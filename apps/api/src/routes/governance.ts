@@ -115,6 +115,19 @@ export async function governanceRoutes(app: FastifyInstance) {
     };
   });
 
+  /* Simulation hook for local E2E verification: feeds a synthetic human message through the
+     exact same ingest → AI → tools → Switch reply path. Auth-protected; not used by the UI. */
+  app.post('/api/debug/simulate-message', async (req, reply) => {
+    const { getSwitchRuntime } = await import('../integrations/switch/runtime.js');
+    const runtime = getSwitchRuntime();
+    if (!runtime) return reply.code(409).send({ error: { code: 'not_running', message: 'Switch runtime is not running' } });
+    const { senderName, body, roomId } = (req.body ?? {}) as { senderName?: string; body?: string; roomId?: string };
+    if (!senderName || !body) return reply.code(400).send({ error: { code: 'bad_request', message: 'senderName and body are required' } });
+    // Fire-and-forget: the AI reply can take a while; poll /api/agent-actions or the room.
+    void runtime.simulateHumanMessage({ senderName, body, roomId }).catch((err) => console.error('[simulate]', err));
+    return { ok: true, queued: true };
+  });
+
   /* Escape hatch for tests — record a typed event manually */
   app.post('/api/events', async (req, reply) => {
     const body = req.body as { kind?: string; payload?: Record<string, unknown> };

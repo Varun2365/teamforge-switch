@@ -13,6 +13,13 @@ import { SwitchCredentialStore, type SwitchCredentials } from './credential-stor
 import { parseHandoffBody, buildHandoffBody } from './handoff.js';
 import { shouldRespond, senderKindOf, isAgentIdentity, extractAgentMentions, normalizeName, type SenderKind } from './routing.js';
 import { respondAsAgent, chooseAgent } from './agent-brain.js';
+import { askTeamForgeAI, ensureBrainConfig } from './ai-brain.js';
+import { getOrganizationOverview } from '../../services/orgService.js';
+import { getOverdueTasks, searchTasks } from '../../services/taskService.js';
+import { getPendingApprovals } from '../../services/approvalService.js';
+import { ProjectModel, DecisionModel } from '../../db/models/ops.js';
+import { EmployeeProfileModel } from '../../db/models/org.js';
+import { ensurePersonEntity, upsertAlias } from '../../services/memoryService.js';
 import { buildToolRegistry } from '../../tools/index.js';
 
 interface RuntimeAgent {
@@ -75,6 +82,7 @@ class SwitchRuntime {
 
     const org = await OrganizationModel.findById(this.organizationId).lean();
     if (!org) { this.running = false; throw new Error(`Organization '${this.organizationId}' not found`); }
+    ensureBrainConfig();
 
     this.users = (await UserModel.find({ orgId: this.organizationId, status: 'active' }).lean()).map((u) => ({ _id: u._id, name: u.name, role: u.role, email: u.email ?? null }));
     this.owner = this.users.find((u) => u.role === 'owner') ?? this.users[0] ?? null;
@@ -131,14 +139,38 @@ class SwitchRuntime {
     await this.persistIntegration('disconnected', 'runtime stopped');
   }
 
-  async deliverProactive(input: { title: string; body: string; mentionNames?: string[]; roomId?: string }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  async deliverProactive(input: { title: string; body: string; mentionNames?: string[]; mentionUserIds?: string[]; roomId?: string }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
     if (!this.configured) return { ok: false, error: 'Switch not configured' };
     try {
       const preferred = chooseAgent(`${input.title} ${input.body}`, 'operations-manager');
-      const messageId = await this.postAsAgent(preferred, `**${input.title}**\n\n${input.body}`, { targetNames: input.mentionNames, roomId: input.roomId ?? this.roomId ?? undefined });
+      const mentionNames = [...(input.mentionNames ?? [])];
+      if (input.mentionUserIds?.length) mentionNames.push(...(await this.participantNamesForUsers(input.mentionUserIds)));
+      const messageId = await this.postAsAgent(preferred, `**${input.title}**\n\n${input.body}`, { targetNames: mentionNames, roomId: input.roomId ?? this.roomId ?? undefined });
       return { ok: true, messageId };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /** Map TeamForge user ids → the participant names the room actually knows (for real @mentions). */
+  private async participantNamesForUsers(userIds: string[]): Promise<string[]> {
+    const entry = this.pickEntry('operations-manager');
+    if (!entry?.client) return [];
+    try {
+      await entry.client.waitForConnection(10_000);
+      const participants = await entry.client.listParticipants();
+      const names = new Set<string>();
+      for (const userId of userIds) {
+        const user = await UserModel.findOne({ orgId: this.organizationId, _id: userId }).lean();
+        if (!user) continue;
+        const switchId = (user.metadata as { switchParticipantId?: string } | undefined)?.switchParticipantId;
+        const match = participants.find((p: any) => (switchId && p.id === switchId))
+          ?? participants.find((p: any) => [p.name, p.alias].filter(Boolean).some((v: string) => normalizeName(v) === normalizeName(user.name) || normalizeName(v).includes(normalizeName(user.name)) || normalizeName(user.name).includes(normalizeName(v))));
+        if (match?.name) names.add(String(match.name));
+      }
+      return [...names];
+    } catch {
+      return [];
     }
   }
 
@@ -223,7 +255,9 @@ class SwitchRuntime {
     if (frame.event === 'message') {
       const roomId = String(data.room_id ?? data.payload?.room_id ?? '');
       if (!roomId) return;
-      await this.enqueueRoom(roomId, () => this.ingestMessage(agent, data));
+      await this.enqueueRoom(roomId, () => this.ingestMessage(agent, data)).catch((error) => {
+        logger.error({ error: error instanceof Error ? error.message : String(error), agent: agent.key }, 'message ingest failed (kept the runtime alive)');
+      });
       return;
     }
     if (frame.event === 'room_join') {
@@ -272,7 +306,7 @@ class SwitchRuntime {
 
     await this.touchAgentState(agent, Boolean(agent.client?.isConnected));
 
-    const sender = this.resolveSender(senderName);
+    const sender = await this.resolveOrCreateSender(senderName, String(payload.sender ?? ''), sentAt);
     let message = await MessageModel.findOne({ orgId: this.organizationId, switchMessageId }).lean();
     let created = false;
 
@@ -334,16 +368,14 @@ class SwitchRuntime {
 
     const started = Date.now();
     try {
-      const reply = await respondAsAgent({
-        organizationId: this.organizationId,
+      const reply = await this.composeReply(replyAgent, {
         roomId,
-        agentKey: replyAgent.key,
-        body: processingBody,
-        requesterId: String(sender?._id ?? `switch:${payload.sender ?? senderName}`),
-        requesterName: handoffForMe ? senderName : sender?.name ?? senderName,
-        requesterRole: sender?.role ?? 'employee',
-        source: 'live',
-        messageId: switchMessageId,
+        message: processingBody,
+        sender,
+        senderName,
+        switchMessageId,
+        addressed: addressed || mentions.length > 0,
+        handoffForMe,
       });
 
       let sentMessageId = '';
@@ -381,7 +413,7 @@ class SwitchRuntime {
         agentKey: replyAgent.key,
         reply: reply.body,
         toolsUsed: reply.toolsUsed,
-        toolErrors: reply.toolErrors,
+        brain: reply.source,
         durationMs: Date.now() - started,
         sentMessageId,
         handoffAgentKey: reply.handoff?.toAgentKey,
@@ -393,8 +425,7 @@ class SwitchRuntime {
         inputSummary: body.slice(0, 300),
         outputSummary: reply.body.replace(/\s+/g, ' ').slice(0, 300),
         durationMs: Date.now() - started,
-        detail: { tools: reply.toolsUsed, handoff: reply.handoff?.toAgentKey },
-        ...(reply.toolErrors.length ? { error: reply.toolErrors.slice(0, 2).join(' | ') } : {}),
+        detail: { tools: reply.toolsUsed, handoff: reply.handoff?.toAgentKey, brain: reply.source },
       });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -774,6 +805,154 @@ class SwitchRuntime {
       },
       { upsert: true },
     ).catch(() => undefined);
+  }
+
+  private async composeReply(
+    agent: RuntimeAgent,
+    input: { roomId: string; message: string; sender: { _id: string; name: string; role: string } | null; senderName: string; switchMessageId: string; addressed: boolean; handoffForMe: boolean },
+  ): Promise<{ body: string; toolsUsed: string[]; handoff?: { fromAgentKey: AgentKey; toAgentKey: AgentKey; instruction: string }; durationMs: number; source: 'ai' | 'fallback' | 'error' }> {
+    const started = Date.now();
+    const conversation = await ConversationModel.findOne({ orgId: this.organizationId, roomId: input.roomId }).lean();
+    const recentDocs = await MessageModel.find({ orgId: this.organizationId, roomId: input.roomId, switchMessageId: { $ne: input.switchMessageId } })
+      .sort({ sentAt: -1 })
+      .limit(8)
+      .lean();
+    const recent = recentDocs.reverse().map((m) => ({ sender: m.senderName ?? 'teammate', body: m.body, at: m.sentAt ?? (m as { createdAt?: Date }).createdAt ?? new Date() }));
+    const snapshot = await this.buildSnapshot();
+
+    const ai = await askTeamForgeAI({
+      orgId: this.organizationId,
+      roomId: input.roomId,
+      roomName: config.SWITCH_ROOM_NAME,
+      agentKey: agent.key,
+      agentName: agent.catalog.name,
+      agentPersona: agent.catalog.description,
+      senderName: input.senderName,
+      senderUserId: input.sender?._id ?? null,
+      senderRole: input.sender?.role ?? 'employee',
+      message: input.message,
+      recent,
+      snapshot,
+      sessionId: conversation?.aiSessionId ?? null,
+    });
+
+    if (ai.ok && ai.body) {
+      if (ai.sessionId) {
+        await ConversationModel.updateOne(
+          { orgId: this.organizationId, roomId: input.roomId },
+          { $set: { aiSessionId: ai.sessionId }, $setOnInsert: { orgId: this.organizationId, roomId: input.roomId, platform: 'switch', title: config.SWITCH_ROOM_NAME } },
+          { upsert: true },
+        ).catch(() => undefined);
+      }
+      return { body: ai.body, toolsUsed: ai.toolsUsed, durationMs: Date.now() - started, source: 'ai' };
+    }
+
+    if (config.AI_FALLBACK_DETERMINISTIC) {
+      logger.warn({ error: ai.error, agent: agent.key }, 'AI brain unavailable — using deterministic fallback for this message');
+      const fb = await respondAsAgent({
+        organizationId: this.organizationId,
+        roomId: input.roomId,
+        agentKey: agent.key,
+        body: input.message,
+        requesterId: input.sender?._id ?? `switch:${input.senderName}`,
+        requesterName: input.senderName,
+        requesterRole: input.sender?.role ?? 'employee',
+        source: 'live',
+        messageId: input.switchMessageId,
+      });
+      return { body: fb.body, toolsUsed: fb.toolsUsed, handoff: fb.handoff, durationMs: Date.now() - started, source: 'fallback' };
+    }
+
+    return {
+      body: `I hit a snag thinking that through — give me a second and try me again?`,
+      toolsUsed: [],
+      durationMs: Date.now() - started,
+      source: 'error',
+    };
+  }
+
+  /** Compact, live org context: the AI starts every reply already knowing the company. */
+  private async buildSnapshot(): Promise<string> {
+    try {
+      const [overview, overdue, openTasks, projects, approvals, decisions, users, profiles, activeReminders] = await Promise.all([
+        getOrganizationOverview(this.organizationId),
+        getOverdueTasks(this.organizationId),
+        searchTasks(this.organizationId, { limit: 10 }),
+        ProjectModel.find({ orgId: this.organizationId, status: { $in: ['planning', 'active'] } }).limit(6).lean(),
+        getPendingApprovals(this.organizationId, 10),
+        DecisionModel.find({ orgId: this.organizationId, status: 'active' }).sort({ decidedAt: -1 }).limit(5).lean(),
+        UserModel.find({ orgId: this.organizationId, status: 'active' }).limit(30).lean(),
+        EmployeeProfileModel.find({ orgId: this.organizationId }).lean(),
+        import('../../db/models/comms.js').then((m) => m.ReminderModel.find({ orgId: this.organizationId, status: { $in: ['scheduled', 'snoozed'] } }).sort({ dueAt: 1 }).limit(5).lean()),
+      ]);
+      const titleById = new Map(profiles.map((p) => [p.userId, p.title]));
+      const lines: string[] = [];
+      lines.push(`Organization: ${config.ORG_NAME} (${users.length} people on record)`);
+      if (users.length) lines.push('People: ' + users.map((u) => `${u.name} (${u.role}${titleById.get(u._id) ? ', ' + titleById.get(u._id) : ''})`).join('; '));
+      else lines.push('People: none recorded yet — the team is new. Capture introductions as they happen.');
+      lines.push('Totals: ' + `${overview.activeProjects} active project(s), ${overview.openTasks} open task(s), ${overview.overdueTasks} overdue, ${overview.blockedTasks} blocked, ${overview.pendingApprovals} approval(s) pending.`);
+      if (projects.length) lines.push('Projects: ' + projects.map((p) => `${p.name} (${p.status}${p.dueDate ? ', due ' + new Date(p.dueDate).toISOString().slice(0, 10) : ''})`).join('; '));
+      const openList = (openTasks as Array<{ title: string; status: string; dueDate?: Date | null; assignees?: Array<{ name: string }> }>).slice(0, 8);
+      if (openList.length) lines.push('Open work: ' + openList.map((t) => `${t.title} [${t.status}${t.assignees?.length ? ', ' + t.assignees.map((a) => a.name).join('/') : ''}${t.dueDate ? ', due ' + new Date(t.dueDate).toISOString().slice(0, 10) : ''}]`).join('; '));
+      if (overdue.length) lines.push('Overdue: ' + overdue.slice(0, 5).map((t) => `${t.title} (${t.assignees?.map((a) => a.name).join('/') || 'unassigned'}, ${t.daysOverdue}d late)`).join('; '));
+      if (decisions.length) lines.push('Recent decisions: ' + decisions.map((d) => `${d.title} (${new Date(d.decidedAt).toISOString().slice(0, 10)})`).join('; '));
+      if (approvals.length) lines.push('Awaiting human approval: ' + approvals.map((a) => a.reason ?? a.action).slice(0, 4).join('; '));
+      if (activeReminders.length) lines.push('Scheduled reminders: ' + activeReminders.map((r) => `${r.title} at ${new Date(r.dueAt).toISOString()}`).join('; '));
+      return lines.join('\n').slice(0, 4000);
+    } catch (error) {
+      return `Organization: ${config.ORG_NAME}. (Context read failed: ${error instanceof Error ? error.message : String(error)})`;
+    }
+  }
+
+  /** Every real teammate gets a record the first time they speak — name from their Discord identity. */
+  private async resolveOrCreateSender(senderName: string, switchParticipantId: string, at: Date): Promise<{ _id: string; name: string; role: string } | null> {
+    const name = senderName.trim() || 'Teammate';
+    const value = normalizeName(name);
+    if (!value) return null;
+    let user = await UserModel.findOne({ orgId: this.organizationId, $or: [{ normalizedName: value }, ...(switchParticipantId ? [{ 'metadata.switchParticipantId': switchParticipantId }] : [])] });
+    if (!user) {
+      user = await UserModel.create({
+        orgId: this.organizationId,
+        name,
+        normalizedName: value,
+        role: 'employee',
+        status: 'active',
+        metadata: { switchParticipantId, firstSeenAt: at.toISOString() },
+        lastSeenAt: at,
+      });
+      await EmployeeProfileModel.updateOne({ orgId: this.organizationId, userId: user._id }, { $setOnInsert: { orgId: this.organizationId, userId: user._id, joinedAt: at } }, { upsert: true });
+      try {
+        const entity = await ensurePersonEntity(this.organizationId, String(user._id), name, null, 'agent:switch-runtime');
+        await upsertAlias(this.organizationId, name, entity._id, 'person', null, 0.99);
+      } catch { /* graph is best-effort here; the AI will link profiles too */ }
+      await logAgentAction(this.organizationId, 'switch-runtime', 'person.discovered', { outputSummary: `New teammate on record: ${name}` });
+      logger.info({ name }, 'new teammate created from room message');
+    } else {
+      await UserModel.updateOne({ _id: user._id }, { $set: { lastSeenAt: at, ...(switchParticipantId ? { 'metadata.switchParticipantId': switchParticipantId } : {}) } }).catch(() => undefined);
+    }
+    return { _id: String(user._id), name: user.name, role: user.role };
+  }
+
+  /** Test/demo hook: feeds a synthetic human message through the exact same ingest path. */
+  async simulateHumanMessage(input: { roomId?: string; senderName: string; body: string }): Promise<{ ok: boolean; roomId?: string; error?: string }> {
+    const roomId = input.roomId ?? this.roomId;
+    if (!roomId) return { ok: false, error: 'no room provisioned' };
+    const ops = this.agents.get('operations-manager') ?? [...this.agents.values()][0];
+    if (!ops) return { ok: false, error: 'no agents' };
+    const messageId = `sim-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await this.ingestMessage(ops, {
+      room_id: roomId,
+      payload: {
+        message_id: messageId,
+        body: input.body,
+        sender_name: input.senderName,
+        sender: `sim:${normalizeName(input.senderName)}`,
+        sender_kind: 'human',
+        timestamp: Date.now(),
+        addressed: false,
+      },
+    });
+    return { ok: true, roomId };
   }
 
   private async persistIntegration(status: string, error: string | undefined) {

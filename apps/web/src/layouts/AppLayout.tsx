@@ -1,62 +1,186 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Users, Network, FolderKanban, ListChecks, Brain, CheckSquare, Bot, Settings, Hammer, Wifi, WifiOff } from 'lucide-react';
-import { clsx } from '../lib/clsx';
-import { useSwitchStatus } from '../lib/hooks';
+import { useEffect, useRef, useState } from 'react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Avatar, Badge, Breadcrumb, Button, Layout, Menu, Tooltip } from 'antd';
+import type { MenuProps } from 'antd';
+import {
+  BellOutlined,
+  CloseOutlined,
+  MenuUnfoldOutlined,
+  SearchOutlined,
+} from '@ant-design/icons';
+import { api } from '../lib/api';
+import { useApprovalsPending, useSwitchStatus } from '../lib/hooks';
+import { NAV_GROUPS, activeNavPath, navEntryForPath } from '../lib/nav';
+import { initials } from '../components/ui';
+import CommandPalette from '../components/CommandPalette';
 
-const NAV = [
-  { to: '/', icon: LayoutDashboard, label: 'Overview' },
-  { to: '/people', icon: Users, label: 'People' },
-  { to: '/graph', icon: Network, label: 'Org Graph' },
-  { to: '/projects', icon: FolderKanban, label: 'Projects' },
-  { to: '/tasks', icon: ListChecks, label: 'Tasks' },
-  { to: '/memory', icon: Brain, label: 'Memory' },
-  { to: '/approvals', icon: CheckSquare, label: 'Approvals' },
-  { to: '/agents', icon: Bot, label: 'Agents' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
-];
+const { Header, Content } = Layout;
+
+const menuItems = NAV_GROUPS.map((group) => ({
+  key: `group-${group.label}`,
+  type: 'group' as const,
+  label: group.label,
+  children: group.items.map((item) => ({
+    key: item.path,
+    icon: item.icon,
+    label: item.label,
+  })),
+})) as MenuProps['items'];
 
 export default function AppLayout() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [navOpen, setNavOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
   const { data: switchStatus } = useSwitchStatus();
+  const pending = useApprovalsPending();
+  const org = useQuery({
+    queryKey: ['org-current'],
+    queryFn: () => api<Record<string, unknown>>('/api/organizations/current'),
+    staleTime: 60_000,
+  });
+
   const live = switchStatus?.server === 'reachable';
-  const online = switchStatus?.runtime?.onlineAgents ?? 0;
-  const total = switchStatus?.runtime?.agents.length ?? 6;
+  const runtime = switchStatus?.runtime;
+  const online = runtime?.onlineAgents ?? 0;
+  const total = runtime?.agents.length ?? 6;
+  const pendingCount = pending.data?.length ?? 0;
+  const orgName = typeof org.data?.name === 'string' ? org.data.name : 'Workspace';
+  const current = navEntryForPath(pathname);
+  const selectedKey = activeNavPath(pathname);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [pathname]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+      if (event.key === 'Escape') setNavOpen(false);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const breadcrumbItems =
+    pathname === '/'
+      ? [{ title: 'Overview' }]
+      : [{ title: <Link to="/">Ops desk</Link> }, { title: current?.label ?? 'Dashboard' }];
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
-      <aside className="flex w-[212px] shrink-0 flex-col bg-[#171612] text-[#b9b7b0]">
-        <div className="flex items-center gap-2 border-b border-white/10 px-4 py-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-accent)] text-[#eaf5ee]">
-            <Hammer size={16} strokeWidth={2.2} />
+    <Layout className="app-shell">
+      {navOpen && <div className="app-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />}
+
+      <aside className={`app-sider${navOpen ? ' is-open' : ''}`} aria-label="Primary navigation">
+        <div className="app-brand">
+          <div className="app-brand-mark" aria-hidden="true">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <path d="M5 6.5h14" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" />
+              <path d="M12 6.5V19" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" />
+            </svg>
           </div>
           <div>
-            <div className="text-[13px] font-bold leading-tight tracking-tight text-[#f2f0ea]">TEAMFORGE</div>
-            <div className="text-[9px] font-medium uppercase tracking-[0.14em] text-[#8f8c84]">Ops desk · Acme</div>
+            <div className="app-brand-name">TEAMFORGE</div>
+            <div className="app-brand-sub">Operations desk</div>
           </div>
         </div>
-        <nav className="scroll-thin flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
-          {NAV.map(({ to, icon: Icon, label }) => (
-            <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => clsx('sidebar-link', isActive && 'active')}>
-              <Icon size={15} strokeWidth={2} />
-              <span>{label}</span>
-            </NavLink>
-          ))}
-        </nav>
-        <div className="border-t border-white/10 px-4 py-3">
-          <div className="flex items-center gap-2 text-[10px] font-medium text-[#8f8c84]">
-            {live ? <Wifi size={11} className="text-emerald-400" /> : <WifiOff size={11} className="text-amber-400" />}
-            <span className="truncate">{live ? `Switch live · ${online}/${total} agents` : 'Switch not reachable'}</span>
+
+        <Menu
+          className="app-nav"
+          theme="dark"
+          mode="inline"
+          items={menuItems}
+          selectedKeys={[selectedKey]}
+          onClick={({ key }) => {
+            navigate(key);
+            setNavOpen(false);
+          }}
+        />
+
+        <div className="sider-foot">
+          <div className="sider-foot-row">
+            <span className={`live-dot${live ? '' : ' is-off'}`} />
+            <span>{live ? 'Switch live' : 'Switch unreachable'}</span>
           </div>
-          <div className="mt-1 text-[9px] leading-snug text-[#6d6b64]">No @mention needed — just say it in the room.</div>
+          <div className="sider-foot-meta">
+            {live ? `${online}/${total} agents · ${runtime?.roomName ?? 'room pending'}` : 'Waiting for the local server'}
+          </div>
+          <div className="sider-foot-note">No @mention needed — just say it in the room.</div>
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="scroll-thin min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1200px] px-6 py-5">
-          <Outlet />
-        </div>
-      </main>
-    </div>
+      <Layout className="app-stage">
+        <Header className="app-header">
+          <div className="header-left">
+            <Button
+              className="nav-toggle"
+              type="text"
+              icon={navOpen ? <CloseOutlined /> : <MenuUnfoldOutlined />}
+              onClick={() => setNavOpen((open) => !open)}
+              aria-label={navOpen ? 'Close navigation' : 'Open navigation'}
+            />
+            <div className="header-crumbs">
+              <Breadcrumb items={breadcrumbItems} />
+            </div>
+          </div>
+
+          <div className="header-right">
+            <button
+              type="button"
+              className="command-trigger"
+              onClick={() => setPaletteOpen(true)}
+              aria-label="Search or jump to a page"
+            >
+              <SearchOutlined style={{ fontSize: 13 }} />
+              <span className="trigger-label">Search or jump to…</span>
+              <span className="kbd">Ctrl K</span>
+            </button>
+
+            <Tooltip title={pendingCount > 0 ? `${pendingCount} approvals waiting` : 'No approvals waiting'}>
+              <Link to="/approvals" aria-label="Approvals">
+                <Badge count={pendingCount} size="small" offset={[-2, 2]}>
+                  <Button type="text" icon={<BellOutlined />} aria-label="Approvals" />
+                </Badge>
+              </Link>
+            </Tooltip>
+
+            <div className="header-divider" />
+
+            <Tooltip title={`${orgName} · organization owner`}>
+              <div className="header-user">
+                <Avatar
+                  size={30}
+                  style={{ background: '#eef5ff', color: '#1677ff', fontSize: 11.5, fontWeight: 600 }}
+                >
+                  {initials(orgName)}
+                </Avatar>
+                <div className="header-user-meta">
+                  <span className="header-user-name">{orgName}</span>
+                  <span className="header-user-org">Organization owner</span>
+                </div>
+              </div>
+            </Tooltip>
+          </div>
+        </Header>
+
+        <Content className="app-scroll" ref={scrollRef}>
+          <div className="page-container">
+            <Outlet />
+          </div>
+        </Content>
+      </Layout>
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+    </Layout>
   );
 }

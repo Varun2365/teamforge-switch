@@ -126,7 +126,7 @@ const commitmentSchema = baseSchema({
   dueDate: Date,
   sourceId: uuidRef('Source'),
   relatedTaskId: uuidRef('Task'),
-  recipient: String, // e.g. 'client', 'the team', 'Karan'
+  recipient: String, // e.g. 'client', 'the team', a teammate
   status: { type: String, enum: ['open', 'done', 'missed', 'cancelled'], default: 'open', index: true },
   createdAt: { type: Date, default: Date.now },
   completedAt: Date,

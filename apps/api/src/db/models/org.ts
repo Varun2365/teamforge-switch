@@ -87,8 +87,8 @@ const userSchema = baseSchema({
   lastSeenAt: Date,
   metadata: mixed,
 });
-userSchema.index({ orgId: 1, email: 1 }, { unique: true, sparse: true });
-userSchema.index({ orgId: 1, discordId: 1 }, { sparse: true });
+userSchema.index({ orgId: 1, email: 1 }, { unique: true, partialFilterExpression: { email: { $type: 'string' } } });
+userSchema.index({ orgId: 1, discordId: 1 }, { partialFilterExpression: { discordId: { $type: 'string' } } });
 export type User = InferSchemaType<typeof userSchema> & { _id: string };
 export const UserModel = (mongoose.models.User as Model<User>) ?? model<User>('User', userSchema);
 

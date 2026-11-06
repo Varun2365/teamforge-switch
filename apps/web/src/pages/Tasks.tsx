@@ -1,141 +1,426 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { LayoutList, Columns3, Plus, Check, ChevronRight } from 'lucide-react';
+import {
+  App,
+  Avatar,
+  Button,
+  Card,
+  Col,
+  DatePicker,
+  Form,
+  Input,
+  Row,
+  Segmented,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Tooltip,
+} from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import {
+  AppstoreOutlined,
+  BarsOutlined,
+  CalendarOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  PlusOutlined,
+} from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
-import { useTasks, usePeople, keys } from '../lib/hooks';
-import { Panel, Chip, Input, Select, Button, Drawer, Spinner, ErrorBox, Empty, statusChip, priorityChip, formatDate } from '../components/ui';
+import type { Dayjs } from 'dayjs';
+import { api, type Task } from '../lib/api';
+import { keys, usePeople, useTasks } from '../lib/hooks';
+import {
+  Drawer,
+  Empty,
+  ErrorBox,
+  PageHeader,
+  Panel,
+  formatDate,
+  initials,
+  priorityChip,
+  statusChip,
+} from '../components/ui';
 
-const KANBAN: Array<{ key: string; label: string; tone: string }> = [
-  { key: 'todo', label: 'To do', tone: 'border-t-[#8a8780]' },
-  { key: 'in_progress', label: 'In progress', tone: 'border-t-[#1d4ed8]' },
-  { key: 'blocked', label: 'Blocked', tone: 'border-t-[#b91c1c]' },
-  { key: 'done', label: 'Done', tone: 'border-t-[#15803d]' },
+const KANBAN = [
+  { key: 'todo', label: 'To do', color: '#94a3b8' },
+  { key: 'in_progress', label: 'In progress', color: '#1677ff' },
+  { key: 'blocked', label: 'Blocked', color: '#dc2626' },
+  { key: 'done', label: 'Done', color: '#16a34a' },
 ];
 
-export default function TasksPage() {
-  const [params] = useSearchParams();
-  const [view, setView] = useState<'list' | 'board'>('list');
-  const [overdueOnly, setOverdueOnly] = useState(params.get('overdue') === 'true');
-  const [selected, setSelected] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const qc = useQueryClient();
+interface TaskFormValues {
+  title: string;
+  priority: string;
+  assigneeUserId?: string;
+  dueDate?: Dayjs;
+}
 
-  const { data: tasks, isLoading, isError, error, refetch } = useTasks(overdueOnly ? { overdue: true } : {});
+export default function TasksPage() {
+  const [params, setParams] = useSearchParams();
+  const [view, setView] = useState<'list' | 'board'>('list');
+  const [selected, setSelected] = useState<string | null>(null);
+  const [form] = Form.useForm<TaskFormValues>();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+
+  const overdueOnly = params.get('overdue') === 'true';
+  const creating = params.get('new') === 'true';
+
+  function setParam(key: string, on: boolean) {
+    const next = new URLSearchParams(params);
+    if (on) next.set(key, 'true');
+    else next.delete(key);
+    setParams(next, { replace: true });
+  }
+
+  const tasks = useTasks(overdueOnly ? { overdue: true } : {});
   const people = usePeople();
 
-  const [form, setForm] = useState({ title: '', priority: 'medium', assigneeUserId: '', dueDate: '' });
   const createTask = useMutation({
-    mutationFn: (body: Record<string, unknown>) => api('/api/tasks', { method: 'POST', body: JSON.stringify(body) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: keys.tasks() }); setCreating(false); setForm({ title: '', priority: 'medium', assigneeUserId: '', dueDate: '' }); },
+    mutationFn: (body: Record<string, unknown>) =>
+      api('/api/tasks', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.tasks() });
+      message.success('Task created.');
+      setParam('new', false);
+      form.resetFields();
+    },
+    onError: (error: Error) => message.error(error.message),
   });
+
   const completeTask = useMutation({
     mutationFn: (id: string) => api(`/api/tasks/${id}/complete`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries(),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      message.success('Task marked done.');
+    },
+    onError: (error: Error) => message.error(error.message),
   });
 
   const grouped = useMemo(() => {
-    const map = new Map<string, NonNullable<typeof tasks>>();
-    for (const col of KANBAN) map.set(col.key, []);
-    for (const t of tasks ?? []) (map.get(t.status) ?? map.set('todo', []).get('todo'))!.push(t);
+    const map = new Map<string, Task[]>();
+    for (const column of KANBAN) map.set(column.key, []);
+    for (const task of tasks.data ?? []) {
+      const list = map.get(task.status) ?? map.get('todo');
+      list?.push(task);
+    }
     return map;
-  }, [tasks]);
+  }, [tasks.data]);
 
-  const selectedTask = (tasks ?? []).find((t) => t.id === selected);
+  const selectedTask = (tasks.data ?? []).find((task) => task.id === selected);
+
+  function submit(values: TaskFormValues) {
+    if (!values.title?.trim() || values.title.trim().length < 3) return;
+    createTask.mutate({
+      title: values.title.trim(),
+      priority: values.priority,
+      assigneeUserId: values.assigneeUserId || undefined,
+      dueDate: values.dueDate ? values.dueDate.toISOString() : undefined,
+    });
+  }
+
+  const columns: ColumnsType<Task> = [
+    {
+      title: 'Task',
+      dataIndex: 'title',
+      render: (title: string, task) => (
+        <div>
+          <div className="cell-primary" style={{ fontWeight: 500 }}>
+            {title}
+          </div>
+          {task.description && (
+            <div className="cell-secondary" style={{ maxWidth: 520, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {task.description}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: 'Owner',
+      dataIndex: 'assignees',
+      width: 180,
+      render: (assignees: Task['assignees']) =>
+        assignees && assignees.length > 0 ? (
+          <Space size={6}>
+            {assignees.slice(0, 2).map((assignee) => (
+              <Avatar
+                key={assignee.userId}
+                size={22}
+                style={{ background: '#eef5ff', color: '#1677ff', fontSize: 9, fontWeight: 600 }}
+              >
+                {initials(assignee.name)}
+              </Avatar>
+            ))}
+            <span style={{ fontSize: 12, color: '#475569' }}>
+              {assignees.map((assignee) => assignee.name.split(' ')[0]).join(', ')}
+            </span>
+          </Space>
+        ) : (
+          <span className="muted" style={{ fontSize: 12 }}>
+            Unassigned
+          </span>
+        ),
+    },
+    { title: 'Status', dataIndex: 'status', width: 124, render: (status: string) => statusChip(status) },
+    { title: 'Priority', dataIndex: 'priority', width: 104, render: (priority: string) => priorityChip(priority) },
+    {
+      title: 'Due',
+      dataIndex: 'dueDate',
+      width: 100,
+      render: (dueDate: string | null, task) => {
+        const overdue = dueDate && task.status !== 'done' && new Date(dueDate).getTime() < Date.now();
+        return (
+          <span className="cell-secondary" style={overdue ? { color: '#dc2626', fontWeight: 600 } : { whiteSpace: 'nowrap' }}>
+            {formatDate(dueDate)}
+          </span>
+        );
+      },
+    },
+    {
+      title: '',
+      width: 56,
+      render: (_value, task) =>
+        task.status !== 'done' ? (
+          <Tooltip title="Mark done">
+            <Button
+              type="text"
+              size="small"
+              icon={<CheckOutlined />}
+              loading={completeTask.isPending && completeTask.variables === task.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                completeTask.mutate(task.id);
+              }}
+              aria-label={`Mark ${task.title} done`}
+            />
+          </Tooltip>
+        ) : null,
+    },
+  ];
 
   return (
-    <div className="space-y-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-bold tracking-tight">Tasks</h1>
-          <p className="text-[12px] text-[var(--color-ink-2)]">{overdueOnly ? 'Showing only overdue work' : 'Everything TEAMFORGE is tracking'}{' '}
-            <button className="font-semibold text-[var(--color-accent)]" onClick={() => setOverdueOnly((v) => !v)}>{overdueOnly ? '· show all' : '· overdue only'}</button>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-[var(--color-line)] bg-[var(--color-panel)] p-0.5">
-            <button title="List view" className={`rounded-md p-1.5 ${view === 'list' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'text-[var(--color-ink-3)]'}`} onClick={() => setView('list')}><LayoutList size={15} /></button>
-            <button title="Board view" className={`rounded-md p-1.5 ${view === 'board' ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]' : 'text-[var(--color-ink-3)]'}`} onClick={() => setView('board')}><Columns3 size={15} /></button>
+    <>
+      <PageHeader
+        title="Tasks"
+        description="Everything TEAMFORGE is tracking, with owners, status and due dates. Switch between a scannable list and a board."
+        extra={
+          <Space size={8} wrap>
+            <Segmented
+              value={overdueOnly ? 'overdue' : 'all'}
+              onChange={(value) => setParam('overdue', value === 'overdue')}
+              options={[
+                { label: 'All work', value: 'all' },
+                { label: 'Overdue', value: 'overdue' },
+              ]}
+            />
+            <Segmented
+              value={view}
+              onChange={(value) => setView(value as 'list' | 'board')}
+              options={[
+                { value: 'list', label: <span><BarsOutlined style={{ marginInlineEnd: 5 }} />List</span> },
+                { value: 'board', label: <span><AppstoreOutlined style={{ marginInlineEnd: 5 }} />Board</span> },
+              ]}
+            />
+            <Button
+              type={creating ? 'default' : 'primary'}
+              icon={creating ? <CloseOutlined /> : <PlusOutlined />}
+              onClick={() => setParam('new', !creating)}
+            >
+              {creating ? 'Close' : 'New task'}
+            </Button>
+          </Space>
+        }
+      />
+
+      <div className="section-stack">
+        {creating && (
+          <Card
+            className="tf-card"
+            title="New task"
+            extra={
+              <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setParam('new', false)} aria-label="Close new task form" />
+            }
+          >
+            <Form form={form} layout="vertical" onFinish={submit} initialValues={{ priority: 'medium' }} requiredMark={false}>
+              <Row gutter={12}>
+                <Col xs={24} lg={9}>
+                  <Form.Item
+                    name="title"
+                    label="Task title"
+                    rules={[{ required: true, min: 3, message: 'Give the task a title of at least 3 characters.' }]}
+                  >
+                    <Input placeholder="What needs to happen?" autoFocus />
+                  </Form.Item>
+                </Col>
+                <Col xs={12} lg={3}>
+                  <Form.Item name="priority" label="Priority">
+                    <Select
+                      options={['low', 'medium', 'high', 'urgent'].map((priority) => ({
+                        value: priority,
+                        label: priority[0]!.toUpperCase() + priority.slice(1),
+                      }))}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={12} lg={5}>
+                  <Form.Item name="assigneeUserId" label="Assignee">
+                    <Select
+                      allowClear
+                      showSearch
+                      optionFilterProp="label"
+                      placeholder="Unassigned"
+                      options={(people.data ?? []).map((person) => ({ value: person.id, label: person.name }))}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={12} lg={4}>
+                  <Form.Item name="dueDate" label="Due date">
+                    <DatePicker style={{ width: '100%' }} format="DD MMM YYYY" suffixIcon={<CalendarOutlined />} />
+                  </Form.Item>
+                </Col>
+                <Col xs={12} lg={3} style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 24 }}>
+                  <Button type="primary" htmlType="submit" block loading={createTask.isPending}>
+                    Create
+                  </Button>
+                </Col>
+              </Row>
+            </Form>
+          </Card>
+        )}
+
+        {tasks.isError ? (
+          <ErrorBox error={tasks.error} onRetry={() => tasks.refetch()} />
+        ) : view === 'list' ? (
+          <Panel flush>
+            <Table
+              rowKey="id"
+              columns={columns}
+              dataSource={tasks.data ?? []}
+              loading={tasks.isLoading}
+              pagination={{ pageSize: 20, hideOnSinglePage: true, showSizeChanger: false }}
+              scroll={{ x: 860 }}
+              onRow={(task) => ({
+                onClick: () => setSelected(task.id),
+                className: 'clickable-row',
+              })}
+              locale={{
+                emptyText: (
+                  <Empty
+                    title="Nothing here."
+                    hint="Either everything is done, or say it in a room and TEAMFORGE will track it here."
+                  />
+                ),
+              }}
+            />
+          </Panel>
+        ) : (
+          <div className="board">
+            {KANBAN.map((column) => {
+              const items = grouped.get(column.key) ?? [];
+              return (
+                <div className="board-column" key={column.key}>
+                  <div className="board-head">
+                    <span className="board-head-title">
+                      <span className="board-dot" style={{ background: column.color }} />
+                      {column.label}
+                    </span>
+                    <span className="board-count">{items.length}</span>
+                  </div>
+                  <div className="board-body">
+                    {items.length === 0 && <div className="board-empty">No tasks</div>}
+                    {items.map((task) => (
+                      <div
+                        key={task.id}
+                        className="task-card"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelected(task.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') setSelected(task.id);
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          {priorityChip(task.priority)}
+                          <span className="cell-secondary">{formatDate(task.dueDate)}</span>
+                        </div>
+                        <p className="task-card-title">{task.title}</p>
+                        <div className="task-card-foot">
+                          <span>
+                            {task.assignees?.map((assignee) => assignee.name.split(' ')[0]).join(', ') || 'Unassigned'}
+                          </span>
+                          {statusChip(task.status)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <Button onClick={() => setCreating((v) => !v)}><Plus size={13} /> New task</Button>
-        </div>
-      </header>
-
-      {creating && (
-        <form className="panel panel-pad grid gap-2 sm:grid-cols-12" onSubmit={(e) => { e.preventDefault(); if (form.title.trim().length >= 3) createTask.mutate({ title: form.title.trim(), priority: form.priority, assigneeUserId: form.assigneeUserId || undefined, dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined }); }}>
-          <Input className="sm:col-span-4" placeholder="Task title…" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} autoFocus required />
-          <Select className="sm:col-span-2" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
-            {['low', 'medium', 'high', 'urgent'].map((p) => <option key={p} value={p}>{p}</option>)}
-          </Select>
-          <Select className="sm:col-span-3" value={form.assigneeUserId} onChange={(e) => setForm({ ...form, assigneeUserId: e.target.value })}>
-            <option value="">Assign to…</option>
-            {(people.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </Select>
-          <Input className="sm:col-span-2" type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
-          <Button type="submit" className="sm:col-span-1">Add</Button>
-        </form>
-      )}
-
-      {isLoading ? <Spinner /> : isError ? <ErrorBox error={error} onRetry={() => refetch()} /> : view === 'list' ? (
-        <Panel>
-          <table className="w-full border-collapse">
-            <thead><tr><th className="th">Task</th><th className="th">Owner</th><th className="th">Status</th><th className="th">Priority</th><th className="th">Due</th><th className="th"></th></tr></thead>
-            <tbody>
-              {(tasks ?? []).map((t) => (
-                <tr key={t.id} className="row-hover">
-                  <td className="td max-w-[420px]"><button className="text-left font-medium leading-snug hover:text-[var(--color-accent)]" onClick={() => setSelected(t.id)}>{t.title}</button></td>
-                  <td className="td text-[var(--color-ink-2)]">{t.assignees?.map((a) => a.name.split(' ')[0]).join(', ') || 'unassigned'}</td>
-                  <td className="td">{statusChip(t.status)}</td>
-                  <td className="td">{priorityChip(t.priority)}</td>
-                  <td className="td font-mono text-[11px] text-[var(--color-ink-3)]">{formatDate(t.dueDate)}</td>
-                  <td className="td text-right">{t.status !== 'done' && <button title="Mark done" className="rounded-md p-1.5 text-[var(--color-ink-3)] hover:bg-[var(--color-ok-soft)] hover:text-[var(--color-ok)]" onClick={() => completeTask.mutate(t.id)}><Check size={14} /></button>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {(tasks ?? []).length === 0 && <Empty title="Nothing here." hint="Either everything's done, or say it in a room and TEAMFORGE will track it." />}
-        </Panel>
-      ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {KANBAN.map((col) => (
-            <div key={col.key} className={`rounded-xl border border-[var(--color-line)] border-t-4 bg-[var(--color-panel)] ${col.tone}`}>
-              <div className="flex items-center justify-between border-b border-[var(--color-line)] px-3 py-2">
-                <span className="stat-label">{col.label}</span>
-                <span className="font-mono text-[10px] text-[var(--color-ink-3)]">{grouped.get(col.key)?.length ?? 0}</span>
-              </div>
-              <ul className="scroll-thin max-h-[65vh] space-y-2 overflow-y-auto p-2">
-                {(grouped.get(col.key) ?? []).map((t) => (
-                  <li key={t.id}>
-                    <button className="w-full rounded-lg border border-[var(--color-line)] bg-[var(--color-paper)] p-2.5 text-left hover:border-[var(--color-accent)]" onClick={() => setSelected(t.id)}>
-                      <div className="flex items-center justify-between gap-2">{priorityChip(t.priority)}<span className="font-mono text-[9px] text-[var(--color-ink-3)]">{formatDate(t.dueDate)}</span></div>
-                      <p className="mt-1.5 text-[11px] font-medium leading-snug">{t.title}</p>
-                      <p className="mt-1 text-[9px] text-[var(--color-ink-3)]">{t.assignees?.map((a) => a.name.split(' ')[0]).join(', ') || 'unassigned'}</p>
-                    </button>
-                  </li>
-                ))}
-                {(grouped.get(col.key)?.length ?? 0) === 0 && <li className="px-2 py-3 text-center text-[10px] text-[var(--color-ink-3)]">empty</li>}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
+        )}
+      </div>
 
       {selectedTask && (
-        <Drawer title={<span className="flex items-center gap-2">Task <ChevronRight size={12} /></span>} onClose={() => setSelected(null)} width={440}>
-          <div className="space-y-4">
+        <Drawer title="Task detail" onClose={() => setSelected(null)} width={480}>
+          <div className="section-stack" style={{ gap: 18 }}>
             <div>
-              {statusChip(selectedTask.status)}
-              <h2 className="mt-2 text-[15px] font-bold leading-snug">{selectedTask.title}</h2>
-              {selectedTask.description && <p className="mt-1 text-[12px] text-[var(--color-ink-2)]">{selectedTask.description}</p>}
-              <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-[var(--color-ink-3)]">
-                <span>Priority {selectedTask.priority}</span><span>·</span><span>Due {formatDate(selectedTask.dueDate)}</span>
-                {selectedTask.assignees?.length ? <><span>·</span><span>Assigned to {selectedTask.assignees.map((a) => a.name).join(', ')}</span></> : <><span>·</span><span>Unassigned</span></>}
+              <Space size={6} wrap>
+                {statusChip(selectedTask.status)}
+                {priorityChip(selectedTask.priority)}
+              </Space>
+              <h2 className="detail-title" style={{ marginTop: 10 }}>
+                {selectedTask.title}
+              </h2>
+              {selectedTask.description && (
+                <p className="detail-subtitle" style={{ marginTop: 6 }}>
+                  {selectedTask.description}
+                </p>
+              )}
+              <div className="detail-meta">
+                <span>
+                  <CalendarOutlined />
+                  Due {formatDate(selectedTask.dueDate)}
+                </span>
+                <span>
+                  {selectedTask.assignees?.length
+                    ? `Assigned to ${selectedTask.assignees.map((assignee) => assignee.name).join(', ')}`
+                    : 'Unassigned'}
+                </span>
               </div>
+              {selectedTask.category && (
+                <Tag variant="filled" style={{ marginTop: 10, marginInlineEnd: 0 }}>
+                  {selectedTask.category}
+                </Tag>
+              )}
             </div>
-            <Button variant="ghost" onClick={() => { completeTask.mutate(selectedTask.id); setSelected(null); }}><Check size={13} /> Mark done</Button>
+
+            <div className="soft-divider" style={{ margin: 0 }} />
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button
+                type="primary"
+                icon={<CheckOutlined />}
+                disabled={selectedTask.status === 'done'}
+                loading={completeTask.isPending && completeTask.variables === selectedTask.id}
+                onClick={() => {
+                  completeTask.mutate(selectedTask.id, {
+                    onSuccess: () => setSelected(null),
+                  });
+                }}
+              >
+                {selectedTask.status === 'done' ? 'Completed' : 'Mark done'}
+              </Button>
+              <Button onClick={() => setSelected(null)}>Close</Button>
+            </div>
+
+            <div className="cell-secondary">
+              Created tasks are recorded in organizational memory and stay traceable to this workspace.
+            </div>
           </div>
         </Drawer>
       )}
-    </div>
+    </>
   );
 }

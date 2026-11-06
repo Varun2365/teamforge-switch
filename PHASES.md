@@ -132,6 +132,22 @@ Legend: `[x]` done & verified · `[ ]` pending · ⚠️ blocked on owner action
 | 8.5 | MEMORY_ENGINE · AGENT_ROLES · API · DEMO_GUIDE · SWITCH_INTEGRATION | [x] | |
 | 8.6 | Final verification: clean seed → all builds → tests → live agent runtime | [x] | 2026-11-06: builds green, 39/39 tests, 6/6 agents online, room auto-provisioned on Discord |
 
+## Phase 9 — AI Brain & Real-Data Pivot (2026-11-06, evening)
+
+> Owner direction: every message must be understood by the AI, not templates; no dummy data; the agent must feel like a real teammate and grow the org record itself; proactive reminders must @mention people.
+
+| # | Step | Status | Notes |
+| --- | --- | --- | --- |
+| 9.1 | AI brain via headless OpenCode (`opencode run --format json`) with the TeamForge MCP server attached | [x] | verified: model called `get_organization_overview` and answered from real data |
+| 9.2 | Per-room persistent AI session + live org snapshot + recent-message context | [x] | `conversations.aiSessionId` |
+| 9.3 | AI decides memory writes: meetings/decisions/commitments/facts via tools, with provenance | [x] | verified: meeting + $10B context + reminder + person entity from one message |
+| 9.4 | Real identities: first message auto-creates the teammate record from their Discord name; intros update the profile | [x] | "Wi Wi Wi Wi" created; AI linked facts |
+| 9.5 | No demo data: bootstrap only; all 173 seeded documents removed | [x] | org renamed Teamforge Workspace |
+| 9.6 | Proactive delivery @mentions the person (Switch targeted messages) | [x] | reminder created → scheduler → room post |
+| 9.7 | Keep deterministic engine only as an offline fallback (never the live path) | [x] | `AI_FALLBACK_DETERMINISTIC` |
+| 9.8 | Index hygiene for optional unique keys (partial indexes) — fixed live crashes | [x] | users.email, reminders/jobs idempotency, notifications dedupe |
+| 9.9 | End-to-end verified with the exact "meeting with Rohan at 11am / Google $10B" message | [x] | human-quality reply posted to the Discord room |
+
 ---
 
 ## Definition of Done (first version) — where we stand
