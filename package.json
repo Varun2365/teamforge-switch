@@ -9,6 +9,7 @@
     "apps/*"
   ],
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "dev": "npm run dev -w @teamforge/api",
     "dev:web": "npm run dev -w @teamforge/web",
     "build": "npm run build -w @teamforge/shared && npm run build -w @teamforge/api && npm run build -w @teamforge/web",
