@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TEAMFORGE one-command setup.
  *
  *   npm run setup
@@ -11,8 +11,8 @@
  *   - tells you the one value only a Switch admin can mint (registration key) if missing
  *
  * The only unavoidable manual step is the Switch registration key: it is a credential
- * created by an admin in the Gateway (API Keys → type "registration"). Everything else
- * — agents, room/channel creation, jobs, org — happens automatically on first run.
+ * created by an admin in the Gateway (API Keys â†’ type "registration"). Everything else
+ * â€” agents, room/channel creation, jobs, org â€” happens automatically on first run.
  */
 import { existsSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
@@ -75,20 +75,20 @@ async function isHealthy(base) {
 }
 
 async function main() {
-  console.log('\nTEAMFORGE setup\n' + '─'.repeat(40));
+  console.log('\nTEAMFORGE setup\n' + 'â”€'.repeat(40));
 
   // 1) .env
   if (!existsSync(envPath)) {
     copyFileSync(examplePath, envPath);
     setEnv('TEAMFORGE_API_KEY', randomBytes(24).toString('hex'));
-    console.log('✓ Created .env with a fresh API key');
+    console.log('âœ“ Created .env with a fresh API key');
   } else {
-    console.log('✓ .env already present');
+    console.log('âœ“ .env already present');
   }
   const env = readEnv();
   if (!env.TEAMFORGE_API_KEY || env.TEAMFORGE_API_KEY === 'change-me-dev-key') {
     setEnv('TEAMFORGE_API_KEY', randomBytes(24).toString('hex'));
-    console.log('✓ Generated TEAMFORGE_API_KEY');
+    console.log('âœ“ Generated TEAMFORGE_API_KEY');
   }
   if (!env.MONGODB_URI) setEnv('MONGODB_URI', 'mongodb://127.0.0.1:27017/teamforge-ops');
   if (!env.PORT) setEnv('PORT', '4100');
@@ -97,7 +97,7 @@ async function main() {
   if (!env.OPENCODE_MODEL) setEnv('OPENCODE_MODEL', 'opencode-go/deepseek-v4.1-flash');
   if (!env.SWITCH_AGENT_SUFFIX) setEnv('SWITCH_AGENT_SUFFIX', '-tf');
   if (!env.SWITCH_ROOM_NAME) setEnv('SWITCH_ROOM_NAME', 'teamforge-lobby');
-  if (!env.OPENCODE_TIMEOUT_MS) setEnv('OPENCODE_TIMEOUT_MS', '90000');
+  if (!env.OPENCODE_TIMEOUT_MS) setEnv('OPENCODE_TIMEOUT_MS', '45000');
   if (!env.SWITCH_AI_RELAY) setEnv('SWITCH_AI_RELAY', 'false');
   if (!env.SWITCH_AUTO_CONNECT) setEnv('SWITCH_AUTO_CONNECT', 'true');
   if (!env.SWITCH_AUTO_PROVISION) setEnv('SWITCH_AUTO_PROVISION', 'true');
@@ -111,9 +111,9 @@ async function main() {
   }
   if (switchBase) {
     setEnv('SWITCH_SERVER_URL', switchBase);
-    console.log(`✓ Switch server found: ${switchBase}`);
+    console.log(`âœ“ Switch server found: ${switchBase}`);
   } else {
-    console.log('✗ No local Switch server responded.');
+    console.log('âœ— No local Switch server responded.');
     console.log('  Open Switch Console (its local server must be running), then re-run npm run setup.');
   }
 
@@ -121,19 +121,19 @@ async function main() {
   let token = env.SWITCH_REGISTRATION_TOKEN;
   if (!token) {
     console.log('\nA Switch registration key is required once. It is an admin credential:');
-    console.log(`  1. Open ${gateway} → API Keys`);
+    console.log(`  1. Open ${gateway} â†’ API Keys`);
     console.log('  2. Create a key of type "registration"');
     console.log('  3. Paste it here (or put SWITCH_REGISTRATION_TOKEN in .env later).');
     if (process.stdin.isTTY) {
       const rl = createInterface({ input: process.stdin, output: process.stdout });
       const answer = (await rl.question('Registration key (leave blank to do this later): ')).trim();
       rl.close();
-      if (answer) { setEnv('SWITCH_REGISTRATION_TOKEN', answer); token = answer; console.log('✓ Registration key saved'); }
+      if (answer) { setEnv('SWITCH_REGISTRATION_TOKEN', answer); token = answer; console.log('âœ“ Registration key saved'); }
     } else {
       console.log('  (non-interactive shell: add SWITCH_REGISTRATION_TOKEN to .env and re-run)');
     }
   } else {
-    console.log('✓ Switch registration key present');
+    console.log('âœ“ Switch registration key present');
   }
   if (token) {
     setEnv('SWITCH_AUTO_CONNECT', 'true');
@@ -145,9 +145,9 @@ async function main() {
   const { spawnSync } = await import('node:child_process');
   const opencode = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['opencode'], { encoding: 'utf8' });
   if (opencode.status === 0) {
-    console.log('✓ OpenCode CLI found (AI brain)');
+    console.log('âœ“ OpenCode CLI found (AI brain)');
   } else {
-    console.log('✗ OpenCode CLI not found on PATH. Install/sign in to OpenCode before live AI replies.');
+    console.log('âœ— OpenCode CLI not found on PATH. Install/sign in to OpenCode before live AI replies.');
     console.log('  Without it, the app still runs and agents answer with the safe offline fallback.');
   }
 
@@ -159,10 +159,10 @@ async function main() {
     mongoOk = true;
   } catch { /* handled below */ }
   if (mongoOk) {
-    console.log('✓ MongoDB reachable');
+    console.log('âœ“ MongoDB reachable');
     await mongoose.disconnect();
   } else {
-    console.log('✗ MongoDB is not reachable at ' + mongoUri);
+    console.log('âœ— MongoDB is not reachable at ' + mongoUri);
     console.log('  Start your MongoDB service, then re-run: npm run setup');
     console.log('  (TEAMFORGE stores everything in its own database, teamforge-ops.)');
   }
@@ -171,10 +171,10 @@ async function main() {
   if (mongoOk) {
     const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     const res = spawnSync(npm, ['run', 'seed'], { stdio: 'inherit', shell: process.platform === 'win32' });
-    console.log(res.status === 0 ? '✓ Organization bootstrapped (no sample data)' : '✗ Bootstrap failed');
+    console.log(res.status === 0 ? 'âœ“ Organization bootstrapped (no sample data)' : 'âœ— Bootstrap failed');
   }
 
-  console.log('\n.env is complete — you never need to edit it by hand.');
+  console.log('\n.env is complete â€” you never need to edit it by hand.');
   console.log('  config: .env');
   console.log('  database: ' + (readEnv().MONGODB_URI || 'mongodb://127.0.0.1:27017/teamforge-ops'));
   console.log('  switch: ' + (readEnv().SWITCH_SERVER_URL || 'not detected'));
@@ -183,7 +183,7 @@ async function main() {
   console.log('  npm run dev        # API + Switch agents (:4100)');
   console.log('  npm run dev:web    # dashboard (:5183)');
   if (!readEnv().SWITCH_REGISTRATION_TOKEN) console.log('\nLive agents stay offline until SWITCH_REGISTRATION_TOKEN is set (add it to .env and re-run setup).');
-  console.log('Then say anything in the Switch room — no @mention needed.\n');
+  console.log('Then say anything in the Switch room â€” no @mention needed.\n');
   process.exit(0);
 }
 

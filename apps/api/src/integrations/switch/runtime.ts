@@ -954,6 +954,79 @@ class SwitchRuntime {
     ).catch(() => undefined);
   }
 
+  /** "X is blocked by Y" → mark the task, log the blocker, explain the cascade. */
+  private async fastBlockerReply(message: string): Promise<{ body: string; toolsUsed: string[] } | null> {
+    const match = message.match(/\b(.{2,80}?)\s+(?:is|are|got)\s+(?:now\s+)?(?:blocked|stuck|held up)\s+(?:by|on)\s+(.{2,80}?)(?:[.?!]|$)/i);
+    if (!match) return null;
+    const subject = match[1]!.trim();
+    const blocker = match[2]!.trim();
+    if (!subject || !blocker) return null;
+
+    const registry = buildToolRegistry();
+    const ctx = {
+      orgId: this.organizationId,
+      actor: { type: 'agent' as const, id: 'operations-manager', name: 'agent:ops-manager' },
+    };
+
+    const words = subject
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !['the', 'our', 'and', 'has', 'been'].includes(w))
+      .sort((a, b) => b.length - a.length);
+
+    let task: any = null;
+    for (const query of [...words, subject]) {
+      if (!query) continue;
+      const found = await registry.call(ctx, 'search_tasks', { query, limit: 5 });
+      if (!found.ok) continue;
+      const list = found.result as any[];
+      task = list.find((t) => String(t.title).toLowerCase().includes(query.toLowerCase())) ?? (list.length === 1 ? list[0] : null);
+      if (task) break;
+    }
+    if (!task) return null;
+
+    const taskId = String(task.id ?? task._id);
+    const toolsUsed = ['search_tasks'];
+    await registry.call(ctx, 'update_task', { taskId, patch: { status: 'blocked' } });
+    toolsUsed.push('update_task');
+    await registry.call(ctx, 'record_event', {
+      kind: 'blocker',
+      excerpt: message.slice(0, 300),
+      payload: { taskId, task: task.title, blocker },
+    });
+    toolsUsed.push('record_event');
+
+    const deps = await registry.call(ctx, 'get_task_dependencies', { taskId });
+    toolsUsed.push('get_task_dependencies');
+    const direct = deps.ok ? ((deps.result as any).blocking ?? []).filter((d: any) => d?.task) : [];
+    const downstream = new Set<string>();
+    for (const d of direct.slice(0, 4)) {
+      downstream.add(String(d.task.title));
+      const next = await registry.call(ctx, 'get_task_dependencies', { taskId: String(d.task._id ?? d.task.id) });
+      if (next.ok) for (const n of (next.result as any).blocking ?? []) if (n?.task?.title) downstream.add(String(n.task.title));
+    }
+
+    let project: any = null;
+    if (task.projectId) {
+      const projectRes = await registry.call(ctx, 'get_project', { projectId: String(task.projectId) });
+      if (projectRes.ok) project = projectRes.result;
+    }
+    const due = project?.dueDate
+      ? new Date(project.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+      : null;
+    const cleanBlocker = blocker.replace(/^the\s+/i, '').replace(/[.]+$/, '');
+
+    const lines = [`Marked ${task.title} as blocked by ${cleanBlocker}. I've logged it on the project record.`];
+    if (downstream.size) {
+      lines.push(`That holds ${[...downstream].slice(0, 4).join(', ')}${due ? `, and puts the ${due} launch date at risk` : ''}.`);
+    } else {
+      lines.push(`Nothing downstream is recorded as waiting on it${due ? `, so the ${due} launch date still stands` : ''}.`);
+    }
+    lines.push('Want me to re-plan the dates or ask the owner for an ETA?');
+    return { body: lines.join(' '), toolsUsed };
+  }
+
   private async composeReply(
     agent: RuntimeAgent,
     input: { roomId: string; message: string; sender: { _id: string; name: string; role: string } | null; senderName: string; switchMessageId: string; addressed: boolean; handoffForMe: boolean },
@@ -983,6 +1056,18 @@ class SwitchRuntime {
         };
       }
       logger.warn({ agent: agent.key, error: res.error.message }, 'deterministic PDF generation failed; letting the model try');
+    }
+
+    // Fast path for explicit blocker statements: record it and trace the
+    // dependency chain from live data, without waiting on the model.
+    if (agent.key === 'operations-manager') {
+      const blocker = await this.fastBlockerReply(input.message).catch((error) => {
+        logger.warn({ error: error instanceof Error ? error.message : String(error) }, 'blocker fast path failed; using AI');
+        return null;
+      });
+      if (blocker) {
+        return { body: blocker.body, toolsUsed: blocker.toolsUsed, durationMs: Date.now() - started, source: 'fallback' };
+      }
     }
 
     // Fast, grounded answers for common factual questions: pure retrieval,
