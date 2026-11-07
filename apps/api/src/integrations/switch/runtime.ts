@@ -485,7 +485,58 @@ class SwitchRuntime {
     };
   }
 
-  /** Verify the room's Discord channel still exists; re-bridge (fresh channel) if it was deleted. */
+/** Create a fresh Switch room + Discord channel for this org and move everything to it. */
+  async recreateRoomChannel(): Promise<{ roomId: string; channelId: string | null }> {
+    const entry = this.pickEntry('operations-manager');
+    if (!entry?.client) throw new Error('No Switch agent is connected');
+    const oldRoom = this.roomId;
+    const detail = oldRoom ? await entry.client.getRoomDetail(oldRoom).catch(() => null) : null;
+    const bridgeId = detail?.bridge_id ? String(detail.bridge_id) : null;
+    if (!bridgeId) throw new Error('The current room has no Discord bridge to recreate');
+
+    const agentNames = [...this.agents.values()].filter((a) => a.client?.isConnected).map((a) => a.client!.switchName);
+    const created = await entry.client.createRoom({
+      name: config.SWITCH_ROOM_NAME,
+      description: config.SWITCH_ROOM_DESCRIPTION,
+      agentNames: agentNames.length ? agentNames : undefined,
+      bridgeId,
+      channelType: detail?.channel_type ?? 'channel_public',
+      instructions: this.roomInstructions(),
+    });
+    const newRoomId = String(created?.id ?? created?.room_id);
+    if (!newRoomId) throw new Error('Switch did not return the new room id');
+    await sleep(2_000);
+    const newDetail = await entry.client.getRoomDetail(newRoomId).catch(() => null);
+    const channelId = newDetail?.external_channel_id ? String(newDetail.external_channel_id) : null;
+
+    this.roomId = newRoomId;
+    await RoomMappingModel.updateOne(
+      { orgId: this.organizationId, name: config.SWITCH_ROOM_NAME },
+      {
+        $set: {
+          switchRoomId: newRoomId,
+          discordChannelId: channelId ?? undefined,
+          metadata: { bridge: { bridgeId, externalChannelId: channelId, channelType: newDetail?.channel_type ?? null } },
+        },
+        $setOnInsert: { orgId: this.organizationId, purpose: 'lobby' },
+      },
+      { upsert: true },
+    );
+    await OrganizationModel.updateOne({ _id: this.organizationId }, { $set: { 'settings.switchRoomIds': newRoomId } });
+
+    for (const agent of this.agents.values()) {
+      if (!agent.client?.isConnected) continue;
+      try { await agent.client.connectToRoom(newRoomId); } catch { /* best effort */ }
+    }
+    if (oldRoom && oldRoom !== newRoomId) {
+      await entry.client.archiveRoom(oldRoom).catch(() => undefined);
+    }
+    await entry.client.postToRoom(newRoomId, 'TEAMFORGE reconnected — this is the new Discord channel for the room.').catch(() => undefined);
+    logger.info({ oldRoom, newRoomId, channelId }, 'recreated Switch room + Discord channel');
+    return { roomId: newRoomId, channelId };
+  }
+
+    /** Verify the room's Discord channel still exists; re-bridge (fresh channel) if it was deleted. */
   private async verifyRoomChannel(agent: RuntimeAgent, roomId: string): Promise<void> {
     if (!config.SWITCH_ROOM_HEALTHCHECK || !agent.client) return;
     try {
@@ -496,15 +547,12 @@ class SwitchRuntime {
         // Invisible probe: proves the bridge can still post to the channel.
         await agent.client.postToRoom(roomId, '\u200b');
       } catch (error) {
-        logger.warn({ roomId, error: error instanceof Error ? error.message : String(error) }, 'room channel missing; provisioning a fresh channel');
-        await agent.client.updateRoom(roomId, bridgeId, detail?.channel_type ?? 'channel_public');
-        await sleep(2_000);
-        for (const a of this.agents.values()) {
-          if (!a.client?.isConnected) continue;
-          try { await a.client.connectToRoom(roomId); } catch { /* best effort */ }
+        logger.warn({ roomId, error: error instanceof Error ? error.message : String(error) }, 'room channel missing; recreating room + channel');
+        try {
+          await this.recreateRoomChannel();
+        } catch (repairError) {
+          logger.error({ roomId, error: repairError instanceof Error ? repairError.message : String(repairError) }, 'could not recreate the room channel');
         }
-        await agent.client.postToRoom(roomId, 'TEAMFORGE reconnected — the Discord channel was recreated.');
-        logger.info({ roomId }, 'room channel recreated');
       }
     } catch (error) {
       logger.warn({ roomId, error: error instanceof Error ? error.message : String(error) }, 'room channel verification skipped');

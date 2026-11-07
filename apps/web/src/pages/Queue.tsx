@@ -60,6 +60,11 @@ export default function QueuePage() {
     onSuccess: (r) => { message.success(`Cleared ${r.cleaned ?? 0} stuck message(s)`); refresh(); },
     onError: (e) => message.error(e instanceof Error ? e.message : 'Failed'),
   });
+  const recreateChannel = useMutation({
+    mutationFn: () => api<{ channelId?: string }>('/api/queue/recreate-channel', { method: 'POST' }),
+    onSuccess: (r) => { message.success(r.channelId ? `Fresh Discord channel created: ${r.channelId}` : 'Room recreated'); refresh(); },
+    onError: (e) => message.error(e instanceof Error ? e.message : 'Failed'),
+  });
   const cancelJob = useMutation({
     mutationFn: (id: string) => api(`/api/queue/jobs/${id}`, { method: 'DELETE' }),
     onSuccess: () => { message.success('Job cancelled'); refresh(); },
@@ -151,6 +156,13 @@ export default function QueuePage() {
               </Popconfirm>
               <Popconfirm title="Mark stuck messages as errored?" onConfirm={() => cleanStuck.mutate()}>
                 <Button icon={<WarningOutlined />} loading={cleanStuck.isPending}>Clean stuck messages</Button>
+              </Popconfirm>
+              <Popconfirm
+                title="Create a fresh Discord channel for this room?"
+                description="Switch provisions a new channel, all six agents move to it, and the old room is archived."
+                onConfirm={() => recreateChannel.mutate()}
+              >
+                <Button icon={<SyncOutlined />} loading={recreateChannel.isPending}>Recreate Discord channel</Button>
               </Popconfirm>
             </Space>
             <div className="mt-3 text-[11px] text-[var(--color-ink-3)]">

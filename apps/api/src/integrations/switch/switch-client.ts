@@ -348,6 +348,10 @@ export class SwitchClient {
     return Array.isArray(result) ? result : result?.bridges ?? [];
   }
 
+  async archiveRoom(roomId: string): Promise<any> {
+    return this.op<any>('archive_room', { room_id: roomId });
+  }
+
   /** Switch's documented typing endpoint — the Discord typing indicator, under this agent's name. */
   async setTyping(roomId: string, isTyping: boolean): Promise<void> {
     await this.request('POST', `/agents/${this.credentials.agentId}/typing`, { room_id: roomId, is_typing: isTyping });

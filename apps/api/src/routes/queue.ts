@@ -47,6 +47,17 @@ export async function queueRoutes(app: FastifyInstance) {
     return { cleaned };
   });
 
+  app.post('/api/queue/recreate-channel', async (_req, reply) => {
+    const runtime = getSwitchRuntime();
+    if (!runtime?.getStatus().running) return reply.code(409).send({ error: { code: 'not_running', message: 'Switch runtime is not running' } });
+    try {
+      const result = await runtime.recreateRoomChannel();
+      return { ok: true, ...result };
+    } catch (error) {
+      return reply.code(500).send({ error: { code: 'recreate_failed', message: error instanceof Error ? error.message : String(error) } });
+    }
+  });
+
   app.delete('/api/queue/jobs/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
     const res = await ScheduledJobModel.updateOne({ orgId: req.auth.orgId, _id: id, status: 'pending' }, { $set: { status: 'cancelled' } });
