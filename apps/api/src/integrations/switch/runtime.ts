@@ -389,6 +389,7 @@ class SwitchRuntime {
     }
 
     const started = Date.now();
+    const stopTyping = this.beginTyping(replyAgent, roomId);
     try {
       const reply = await this.composeReply(replyAgent, {
         roomId,
@@ -401,6 +402,7 @@ class SwitchRuntime {
       });
 
       if (reply.relayed) {
+        stopTyping();
         await this.finishMessage(message._id, { status: 'relayed', relayedTo: config.SWITCH_AI_AGENT_NAME, at: new Date().toISOString() });
         await logAgentAction(this.organizationId, this.agentActor(replyAgent), 'relayed_to_switch_agent', {
           roomId,
@@ -465,6 +467,47 @@ class SwitchRuntime {
       await this.finishMessage(message._id, { status: 'error', error: detail });
       await logAgentAction(this.organizationId, this.agentActor(replyAgent), 'reply_failed', { roomId, error: detail, durationMs: Date.now() - started });
       logger.error({ roomId, agent: replyAgent.key, error: detail }, 'Switch agent reply failed');
+    } finally {
+      stopTyping();
+    }
+  }
+
+  /** Shows the Discord typing indicator via Switch's typing endpoint, refreshed until the reply lands. */
+  private beginTyping(agent: RuntimeAgent, roomId: string): () => void {
+    if (!config.SWITCH_TYPING_INDICATOR || !agent.client?.isConnected) return () => undefined;
+    const tick = () => { void agent.client?.setTyping(roomId, true).catch(() => undefined); };
+    tick();
+    const timer = setInterval(tick, 8000);
+    timer.unref?.();
+    return () => {
+      clearInterval(timer);
+      void agent.client?.setTyping(roomId, false).catch(() => undefined);
+    };
+  }
+
+  /** Verify the room's Discord channel still exists; re-bridge (fresh channel) if it was deleted. */
+  private async verifyRoomChannel(agent: RuntimeAgent, roomId: string): Promise<void> {
+    if (!config.SWITCH_ROOM_HEALTHCHECK || !agent.client) return;
+    try {
+      const detail = await agent.client.getRoomDetail(roomId);
+      const bridgeId = detail?.bridge_id ? String(detail.bridge_id) : null;
+      if (!bridgeId) return;
+      try {
+        // Invisible probe: proves the bridge can still post to the channel.
+        await agent.client.postToRoom(roomId, '\u200b');
+      } catch (error) {
+        logger.warn({ roomId, error: error instanceof Error ? error.message : String(error) }, 'room channel missing; provisioning a fresh channel');
+        await agent.client.updateRoom(roomId, bridgeId, detail?.channel_type ?? 'channel_public');
+        await sleep(2_000);
+        for (const a of this.agents.values()) {
+          if (!a.client?.isConnected) continue;
+          try { await a.client.connectToRoom(roomId); } catch { /* best effort */ }
+        }
+        await agent.client.postToRoom(roomId, 'TEAMFORGE reconnected — the Discord channel was recreated.');
+        logger.info({ roomId }, 'room channel recreated');
+      }
+    } catch (error) {
+      logger.warn({ roomId, error: error instanceof Error ? error.message : String(error) }, 'room channel verification skipped');
     }
   }
 
@@ -565,6 +608,8 @@ class SwitchRuntime {
         logger.error({ agent: agent.key, roomId, error: agent.lastError }, 'could not bind agent to the operations room');
       }
     }
+
+    await this.verifyRoomChannel(operations, roomId);
 
     await RoomMappingModel.updateOne(
       { orgId: this.organizationId, switchRoomId: roomId },

@@ -51,6 +51,8 @@ const configSchema = z.object({
   SWITCH_USER_NAMES: z.string().default('').transform((v) => v.split(',').map((s) => s.trim()).filter(Boolean)),
   SWITCH_AGENT_SUFFIX: z.string().default('-tf'),
   SWITCH_CREDENTIALS_PATH: z.string().default('data/switch-credentials.json'),
+  SWITCH_TYPING_INDICATOR: z.string().default('true').transform((v) => v !== 'false'),
+  SWITCH_ROOM_HEALTHCHECK: z.string().default('true').transform((v) => v !== 'false'),
   // Legacy optional bridge (kept only as a fallback when the runtime is offline).
   SWITCH_PROACTIVE_AGENT_ID: z.string().default(''),
   SWITCH_PROACTIVE_API_KEY: z.string().default(''),

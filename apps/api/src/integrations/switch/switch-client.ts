@@ -347,6 +347,21 @@ export class SwitchClient {
     const result = await this.op<any>('list_bridges', {});
     return Array.isArray(result) ? result : result?.bridges ?? [];
   }
+
+  /** Switch's documented typing endpoint — the Discord typing indicator, under this agent's name. */
+  async setTyping(roomId: string, isTyping: boolean): Promise<void> {
+    await this.request('POST', `/agents/${this.credentials.agentId}/typing`, { room_id: roomId, is_typing: isTyping });
+  }
+
+  /** Post directly to a room without needing a claimed connection. */
+  async postToRoom(roomId: string, content: string): Promise<void> {
+    await this.request('POST', `/agents/${this.credentials.agentId}/message`, { room_id: roomId, content });
+  }
+
+  /** Move a room onto a bridge (or re-bridge it), provisioning a fresh external channel. */
+  async updateRoom(roomId: string, bridgeId: string, channelType = 'channel_public'): Promise<any> {
+    return this.op<any>('update_room', { room_id: roomId, bridge_id: bridgeId, channel_type: channelType });
+  }
 }
 
 export function newConnectionId(): string {
