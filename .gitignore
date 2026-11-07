@@ -16,6 +16,7 @@ apps/api/live.log
 
 # Local-only demo/recording runbook
 RECORDING.md
+elevenlabs.md
 
 # Local blog draft (not published in the repo)
 blog.md
