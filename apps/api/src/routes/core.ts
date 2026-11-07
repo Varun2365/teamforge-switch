@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
+import { createReadStream } from 'node:fs';
 import { getOrganizationGraph } from '../services/graphService.js';
 import { dbPing } from '../db/connection.js';
 import { config } from '../config.js';
+import { resolveServedFile } from '../services/fileService.js';
 import { OrganizationModel, DepartmentModel, TeamModel, UserModel, EmployeeProfileModel } from '../db/models/org.js';
 import { ProjectModel, TaskModel, TaskAssignmentModel, DecisionModel } from '../db/models/ops.js';
 import { ApprovalModel, AgentActionModel, NotificationModel } from '../db/models/comms.js';
@@ -22,6 +24,18 @@ export async function coreRoutes(app: FastifyInstance) {
       demoMode: config.TEAMFORGE_DEMO_MODE,
       switchServer: config.SWITCH_SERVER_URL,
     };
+  });
+
+  // Generated PDFs. Unguessable random filenames; public so links/attachments work.
+  app.get('/files/:name', async (req, reply) => {
+    const { name } = req.params as { name: string };
+    const filePath = resolveServedFile(name);
+    if (!filePath) return reply.code(404).send({ error: { code: 'not_found', message: 'File not found' } });
+    reply
+      .type('application/pdf')
+      .header('Content-Disposition', `inline; filename="${name}"`)
+      .header('Cache-Control', 'private, max-age=300');
+    return reply.send(createReadStream(filePath));
   });
 
   app.get('/api/overview', async (req) => {

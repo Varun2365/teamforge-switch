@@ -2,6 +2,7 @@ import { config } from './config.js';
 import { connectDb, disconnectDb } from './db/connection.js';
 import { buildApp } from './app.js';
 import { startScheduler } from './workers/scheduler.js';
+import { clearStuckMessages } from './workers/scheduler.js';
 import { startSwitchRuntime, stopSwitchRuntime } from './integrations/switch/runtime.js';
 import { OrganizationModel } from './db/models/org.js';
 
@@ -14,6 +15,8 @@ async function main() {
 
   const org = await OrganizationModel.findOne({ slug: config.ORG_SLUG }).lean();
   if (org) {
+    const cleared = await clearStuckMessages(String(org._id)).catch(() => 0);
+    if (cleared) console.log(`[teamforge] cleared ${cleared} message(s) left in processing by a previous run`);
     void startSwitchRuntime(org._id)
       .then((runtime) => {
         const status = runtime.getStatus();

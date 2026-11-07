@@ -134,6 +134,28 @@ export async function respondAsAgent(message: AgentMessage): Promise<AgentReply>
 
 /* ───────── Operations Manager ───────── */
 
+/**
+ * Live-data fast path for the most common factual questions. Answers come
+ * straight from the database in milliseconds, with no model round-trip.
+ * Returns null when it cannot answer confidently, so the caller can use the
+ * AI brain instead.
+ */
+export async function tryFastReply(message: AgentMessage): Promise<AgentReply | null> {
+  if (message.agentKey !== 'operations-manager') return null;
+  const lower = message.body.toLowerCase();
+  const isStatus = /\b(status|progress|on track|where (are|is) (we|it|things)|how('s| is) (the|our)?\s*(project|launch|work|website)|what'?s the (status|update))\b/.test(lower);
+  const isOwner = /\bwho(?:'s| is| are| owns| own|s)?\s+(handling|owning|owns|working on|on|leading|doing|responsible (?:for)?)\b/.test(lower) || /\bwho knows\b/.test(lower);
+  const isOverdue = /\b(what'?s overdue|anything overdue|what'?s blocked|what is blocked|any blockers|what are the risks)\b/.test(lower);
+  const isReminder = /\b(remind|reminder)\b/.test(lower);
+  if (!isStatus && !isOwner && !isOverdue && !isReminder) return null;
+
+  const reply = await respondAsAgent(message);
+  if (/not fully sure|not 100% sure|something glitched/i.test(reply.body)) return null;
+  // Fast factual answers are posted by the Operations Manager only — never a
+  // handoff, so the room stays one voice.
+  return { ...reply, handoff: undefined };
+}
+
 async function operationsReply(message: AgentMessage, use: (n: string, i?: Record<string, unknown>) => Promise<any>): Promise<string> {
   const body = statementText(message.body);
   const lower = body.toLowerCase();
@@ -153,9 +175,11 @@ async function operationsReply(message: AgentMessage, use: (n: string, i?: Recor
       title: reminder.title,
       body: reminder.body,
       dueAt: reminder.dueAt.toISOString(),
+      userId: message.requesterId.startsWith('switch:') ? null : message.requesterId,
+      roomId: message.roomId ?? null,
       idempotencyKey: `agent:reminder:${message.messageId ?? body.slice(0, 32)}`,
     });
-    if (result) return `Done — I'll nudge ${reminder.whenLabel} to ${reminder.title.toLowerCase()}.`;
+    if (result) return `Done — I'll nudge you ${reminder.whenLabel} to ${reminder.title.toLowerCase()}.`;
     return `I heard you want a reminder, but the reminder service balked. Try me again in a bit.`;
   }
 
@@ -180,23 +204,55 @@ async function operationsReply(message: AgentMessage, use: (n: string, i?: Recor
     return `I don't have that on record yet, ${name}. When a decision lands in the room (or a meeting note lands here), I'll keep it — that's how memory gets built.`;
   }
 
+  // 4b) "who's handling X" / "who owns X" — answer with the real assignee and what it waits on
+  const ownerMatch = lower.match(/\bwho(?:'s| is| are| owns| own|s)?\s+(?:handling|owning|owns|own|working on|on|leading|doing|responsible for)\s+([a-z0-9 .&+#-]{2,40})/);
+  if (ownerMatch) {
+    const query = ownerMatch[1]!.replace(/\b(the|a|an|task|work)\b/g, ' ').replace(/[?.,!]+$/, '').trim();
+    const found = await use('search_tasks', { query, limit: 5 });
+    const tasks = (Array.isArray(found) ? found : []) as any[];
+    if (tasks.length) {
+      const task = tasks.find((t) => t.assignees?.length) ?? tasks[0];
+      const owner = task.assignees?.[0]?.name ?? 'nobody yet';
+      const deps = await use('get_task_dependencies', { taskId: task.id ?? task._id });
+      const waitingOn = (deps?.dependsOn ?? []).map((d: any) => d?.task?.title).filter(Boolean);
+      const lines = [`${owner.split(' ')[0]} has ${task.title} — ${task.status.replace(/_/g, ' ')}, due ${dateLabel(task.dueDate)}.`];
+      if (waitingOn.length) lines.push(`It's waiting on ${waitingOn.join(' and ')}.`);
+      return lines.join(' ');
+    }
+  }
+
   // 5) project / launch / blockers / risk
   if (/\b(project|launch|website|risk|block|overdue|late|slip|behind|deadline|due)\b/.test(lower)) {
     const overdue = await use('get_overdue_tasks', {});
-    const projects = await use('search_tasks', { status: 'in_progress', limit: 5 });
-    const overdueList = Array.isArray(overdue) ? overdue : [];
-    const lines = [`Okay ${name}, here's the honest picture:`];
+    const projects = (await use('search_projects', { limit: 10 })) as any[] | null;
+    const overdueList = (Array.isArray(overdue) ? overdue : []) as any[];
+    const list = Array.isArray(projects) ? projects : [];
+    const words = significantWords(body);
+    const named = list.find((p) => words.some((w) => p.name.toLowerCase().includes(w)));
+    const project = named ?? list.find((p) => p.status === 'active') ?? list[0];
+    const lines = [`Here's where things stand, ${name}:`];
+    if (project) {
+      const projectId = project.id ?? project._id;
+      const tasks = ((await use('search_tasks', { projectId, limit: 20 })) ?? []) as any[];
+      const risky = tasks.filter((t) => t.status === 'blocked');
+      const done = tasks.filter((t) => t.status === 'done').length;
+      lines.push(`**${project.name}** — ${project.status.replace(/_/g, ' ')} · due ${dateLabel(project.dueDate)} · ${done}/${tasks.length} done${risky.length ? ` · ${risky.length} blocked` : ''}.`);
+      for (const t of tasks.filter((t) => t.status !== 'done').slice(0, 6)) {
+        const who = (t.assignees?.[0]?.name ?? 'unassigned').split(' ')[0];
+        lines.push(`• ${t.title} — ${who} · ${t.status.replace(/_/g, ' ')} · ${dateLabel(t.dueDate)}`);
+      }
+      if (overdueList.length) {
+        const t = overdueList[0]!;
+        lines.push(`⚠️ Oldest overdue: ${t.title} — ${(t.assignees?.[0]?.name ?? 'unassigned').split(' ')[0]} · was due ${dateLabel(t.dueDate)} (${t.daysOverdue ?? '?'}d late)`);
+      }
+      lines.push(`Want me to re-plan the dates or pull the full PDF report?`);
+      return lines.join('\n');
+    }
     if (overdueList.length) {
-      const t = overdueList[0] as any;
+      const t = overdueList[0]!;
       lines.push(`⚠️ ${t.title} — ${(t.assignees?.[0]?.name ?? 'unassigned').split(' ')[0]} · was due ${dateLabel(t.dueDate)} (${t.daysOverdue ?? '?'}d late)`);
-      const deps = await use('get_task_dependencies', { taskId: t.id ?? t._id });
-      const waiting = deps?.blocking?.map((d: any) => d?.task?.title).filter(Boolean) ?? [];
-      if (waiting.length) lines.push(`Blocking: ${waiting.slice(0, 3).join(' · ')}`);
     }
-    if (projects?.length) {
-      lines.push(`In flight: ${(projects as any[]).slice(0, 3).map((t) => t.title).join(' · ')}`);
-    }
-    lines.push(`Want me to bring in @project-manager to re-plan, or @quality-risk to size the blast radius?`);
+    lines.push(`Want me to re-plan the dates, or explain what it affects downstream?`);
     return lines.join('\n');
   }
 
@@ -358,7 +414,7 @@ async function riskReply(message: AgentMessage, use: (n: string, i?: Record<stri
   }
   lines.push('Recommended moves:');
   for (const r of risks.slice(0, 3)) lines.push(`• ${r.recommendation}`);
-  if (/\b(plan|re-?plan|reschedule)\b/.test(lower)) lines.push('Say the word and @project-manager re-plans around this.');
+  if (/\b(plan|re-?plan|reschedule)\b/.test(lower)) lines.push('Say the word and I will re-plan around this.');
   return lines.join('\n');
 }
 
@@ -387,9 +443,20 @@ interface ParsedReminderIntent {
 }
 
 function parseReminderIntent(body: string): ParsedReminderIntent | null {
-  const m = body.match(/\bremind\s+(?:([a-z]+(?:\s+[a-z]+)?)\s+)?(?:me\s+)?(?:to\s+)?(.+?)\s+(?:at|on|by|before)\s+([^.!?]+)/i);
-  if (!m) return null;
-  const tail = m[3]!.trim().toLowerCase();
+  // Two natural orders: "remind me at 7:45pm to review the plan"
+  // and "remind me to review the plan at 7:45pm".
+  let tail = '';
+  let title = '';
+  const timeFirst = body.match(/\bremind\s+(?:me\s+)?(?:at|on|by)\s+([^.!?]+?)\s+to\s+(.+)$/i);
+  if (timeFirst) {
+    tail = timeFirst[1]!.trim().toLowerCase();
+    title = clean(timeFirst[2]!.replace(/^that\s+/i, '').replace(/^to\s+/i, ''));
+  } else {
+    const m = body.match(/\bremind\s+(?:([a-z]+(?:\s+[a-z]+)?)\s+)?(?:me\s+)?(?:to\s+)?(.+?)\s+(?:at|on|by|before)\s+([^.!?]+)/i);
+    if (!m) return null;
+    tail = m[3]!.trim().toLowerCase();
+    title = clean(m[2]!.replace(/^that\s+/i, '').replace(/^to\s+/i, ''));
+  }
   const base = new Date();
   let dueAt: Date | null = null;
   let whenLabel = tail;
@@ -411,16 +478,18 @@ function parseReminderIntent(body: string): ParsedReminderIntent | null {
       let hour = Number(timeMatch[1]);
       const minute = timeMatch[2] ? Number(timeMatch[2]) : 0;
       const meridiem = timeMatch[3];
+      // A bare hour in the past today usually means the next occurrence.
       if (meridiem === 'pm' && hour < 12) hour += 12;
       if (meridiem === 'am' && hour === 12) hour = 0;
+      if (!meridiem && hour < 12 && dueAt.getTime() < base.getTime()) hour += 12;
       dueAt.setHours(hour, minute, 0, 0);
+      if (dayOffset === null && !weekdayMatch && dueAt.getTime() <= base.getTime()) dueAt.setDate(dueAt.getDate() + 1);
     } else {
       dueAt.setHours(9, 30, 0, 0);
     }
     whenLabel = dueAt.toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
   }
   if (!dueAt) return null;
-  const title = clean(m[2]!.replace(/^that\s+/i, '').replace(/^to\s+/i, ''));
   if (title.length < 3) return null;
   return { title: title.charAt(0).toUpperCase() + title.slice(1), body, dueAt, whenLabel };
 }

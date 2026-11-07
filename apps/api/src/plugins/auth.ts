@@ -37,7 +37,7 @@ export function createAuthHook() {
   return async function onRequest(req: FastifyRequest, reply: FastifyReply) {
     if (req.method === 'OPTIONS') return;
     const url = req.url.split('?')[0]!;
-    if (PUBLIC.includes(url)) return;
+    if (PUBLIC.includes(url) || url.startsWith('/files/')) return;
 
     const header = req.headers.authorization ?? '';
     const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';

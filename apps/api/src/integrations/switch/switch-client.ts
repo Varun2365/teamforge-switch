@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import WebSocket from 'ws';
 import { logger } from '../../utils/logger.js';
 import type { SwitchCredentials } from './credential-store.js';
@@ -350,6 +351,27 @@ export class SwitchClient {
 
   async archiveRoom(roomId: string): Promise<any> {
     return this.op<any>('archive_room', { room_id: roomId });
+  }
+
+  /** Post a real file attachment into the room through Switch (multipart). */
+  async sendMedia(roomId: string, filePath: string, filename: string, caption?: string): Promise<string> {
+    const bytes = new Uint8Array(readFileSync(filePath));
+    const form = new FormData();
+    form.append('file', new Blob([bytes], { type: 'application/pdf' }), filename);
+    if (caption) form.append('caption', caption);
+    const response = await fetch(`${this.baseUrl}/agents/${this.credentials.agentId}/rooms/${roomId}/media`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${this.credentials.apiKey}` },
+      body: form,
+    });
+    const text = await response.text();
+    if (!response.ok) throw new SwitchApiError(`Switch media upload failed (${response.status}): ${errorDetail(text)}`, response.status, text);
+    try {
+      const parsed = JSON.parse(text) as { event_id?: string; result?: { event_id?: string } };
+      return String(parsed.event_id ?? parsed.result?.event_id ?? '');
+    } catch {
+      return '';
+    }
   }
 
   /** Switch's documented typing endpoint — the Discord typing indicator, under this agent's name. */

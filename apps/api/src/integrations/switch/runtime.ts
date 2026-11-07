@@ -12,8 +12,9 @@ import { SwitchClient, SwitchApiError, openSwitchAgentAddressing, registerSwitch
 import { SwitchCredentialStore, type SwitchCredentials } from './credential-store.js';
 import { parseHandoffBody, buildHandoffBody } from './handoff.js';
 import { shouldRespond, senderKindOf, isAgentIdentity, extractAgentMentions, normalizeName, type SenderKind } from './routing.js';
-import { respondAsAgent, chooseAgent } from './agent-brain.js';
+import { respondAsAgent, chooseAgent, tryFastReply } from './agent-brain.js';
 import { askTeamForgeAI, ensureBrainConfig } from './ai-brain.js';
+import { resolveServedFile } from '../../services/fileService.js';
 import { getOrganizationOverview } from '../../services/orgService.js';
 import { getOverdueTasks, searchTasks } from '../../services/taskService.js';
 import { getPendingApprovals } from '../../services/approvalService.js';
@@ -414,19 +415,39 @@ class SwitchRuntime {
       }
 
       let sentMessageId = '';
-      try {
-        const targets = !handoffForMe && (addressed || mentions.length)
-          ? this.resolveParticipantNames([senderName], await this.getParticipantNames(replyAgent, roomId))
-          : [];
-        if (targets.length) {
-          const result = await replyAgent.client.sendTargetedMessage(reply.body, targets, threadId);
-          sentMessageId = String(result?.event_id ?? result?.message_id ?? result?.id ?? '');
-        } else {
+      let attachmentSent = false;
+      const pdfMatch = reply.body.match(/\/files\/([A-Za-z0-9._-]+\.pdf)/i);
+      if (pdfMatch) {
+        const filePath = resolveServedFile(pdfMatch[1]!);
+        if (filePath) {
+          try {
+            const caption = reply.body
+              .replace(/https?:\/\/\S+\/files\/[^\s)]+/i, '')
+              .replace(/\n{3,}/g, '\n\n')
+              .trim();
+            sentMessageId = await replyAgent.client.sendMedia(roomId, filePath, pdfMatch[1]!, caption || 'Here is the report.');
+            attachmentSent = true;
+            logger.info({ roomId, agent: replyAgent.key, file: pdfMatch[1] }, 'PDF attachment posted to room');
+          } catch (error) {
+            logger.warn({ roomId, agent: replyAgent.key, error: error instanceof Error ? error.message : String(error) }, 'PDF attachment failed; posting the link instead');
+          }
+        }
+      }
+      if (!attachmentSent) {
+        try {
+          const targets = !handoffForMe && (addressed || mentions.length)
+            ? this.resolveParticipantNames([senderName], await this.getParticipantNames(replyAgent, roomId))
+            : [];
+          if (targets.length) {
+            const result = await replyAgent.client.sendTargetedMessage(reply.body, targets, threadId);
+            sentMessageId = String(result?.event_id ?? result?.message_id ?? result?.id ?? '');
+          } else {
+            sentMessageId = await replyAgent.client.postMessage(reply.body, threadId);
+          }
+        } catch (error) {
+          logger.warn({ roomId, agent: replyAgent.key, error: error instanceof Error ? error.message : String(error) }, 'targeted Switch reply failed; broadcasting instead');
           sentMessageId = await replyAgent.client.postMessage(reply.body, threadId);
         }
-      } catch (error) {
-        logger.warn({ roomId, agent: replyAgent.key, error: error instanceof Error ? error.message : String(error) }, 'targeted Switch reply failed; broadcasting instead');
-        sentMessageId = await replyAgent.client.postMessage(reply.body, threadId);
       }
 
       let handoffMessageId: string | undefined;
@@ -938,7 +959,52 @@ class SwitchRuntime {
     input: { roomId: string; message: string; sender: { _id: string; name: string; role: string } | null; senderName: string; switchMessageId: string; addressed: boolean; handoffForMe: boolean },
   ): Promise<{ body: string; toolsUsed: string[]; handoff?: { fromAgentKey: AgentKey; toAgentKey: AgentKey; instruction: string }; durationMs: number; source: 'ai' | 'switch' | 'fallback' | 'error'; relayed?: boolean }> {
     const started = Date.now();
-    const conversation = await ConversationModel.findOne({ orgId: this.organizationId, roomId: input.roomId }).lean();
+
+    // Fast, deterministic path for document requests: a report should never wait on
+    // the model or fail because the upstream is busy. The PDF is attached by the
+    // caller when the reply contains its /files/...pdf link.
+    if (/\b(pdf|document|report|one[- ]?pager)\b/i.test(input.message) && /\b(create|make|generate|send|export|prepare|draft|produce|build|need|want)\b/i.test(input.message)) {
+      const forMatch = input.message.match(/\bfor\s+(?:the\s+)?(.+?)(?:\s+(?:and|then|please|pdf|report)\b|$)/i);
+      const projectName = forMatch?.[1]?.trim().replace(/[.,!?]+$/, '') || undefined;
+      const registry = buildToolRegistry();
+      const res = await registry.call(
+        { orgId: this.organizationId, actor: { type: 'agent', id: agent.key, name: `agent:${agent.catalog.switchName}` } },
+        'create_project_status_pdf',
+        projectName ? { projectName } : {},
+      );
+      if (res.ok) {
+        const result = res.result as { projectName?: string; url?: string };
+        logger.info({ agent: agent.key, url: result.url, keys: Object.keys(result as object) }, 'deterministic PDF generated');
+        return {
+          body: `Done — ${result.projectName ?? 'project'} status report is attached as a PDF. ${result.url ?? ''}`.trim(),
+          toolsUsed: ['create_project_status_pdf'],
+          durationMs: Date.now() - started,
+          source: 'ai',
+        };
+      }
+      logger.warn({ agent: agent.key, error: res.error.message }, 'deterministic PDF generation failed; letting the model try');
+    }
+
+    // Fast, grounded answers for common factual questions: pure retrieval,
+    // no model latency. Falls through to the AI brain when unsure.
+    const fast = await tryFastReply({
+      organizationId: this.organizationId,
+      roomId: input.roomId,
+      agentKey: agent.key,
+      body: input.message,
+      requesterId: input.sender?._id ?? `switch:${input.senderName}`,
+      requesterName: input.senderName,
+      requesterRole: input.sender?.role ?? 'employee',
+      source: 'live',
+      messageId: input.switchMessageId,
+    }).catch((error) => {
+      logger.warn({ agent: agent.key, error: error instanceof Error ? error.message : String(error) }, 'fast reply failed; using AI');
+      return null;
+    });
+    if (fast) {
+      return { body: fast.body, toolsUsed: fast.toolsUsed, durationMs: Date.now() - started, source: 'fallback' };
+    }
+
     const recentDocs = await MessageModel.find({ orgId: this.organizationId, roomId: input.roomId, switchMessageId: { $ne: input.switchMessageId } })
       .sort({ sentAt: -1 })
       .limit(5)

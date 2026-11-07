@@ -69,8 +69,18 @@ On first boot TEAMFORGE looks for a room called **`teamforge-lobby`**. If it doe
 1. Someone types in Discord — no commands, no @mention needed.
 2. Switch delivers the event to the six agents.
 3. Routing picks one responder (humans → Operations Manager; @mentions → that specialist).
-4. The AI reads a live snapshot of the organization, calls **MCP tools** to read or change real data, and writes a short, human answer.
-5. The reply goes back through Switch into the room. Every tool call and reply is logged with the agent's Switch identity.
+4. The Operations Manager first tries a **live-data fast path**: status, ownership, deadline and reminder questions are answered straight from MongoDB in milliseconds. Anything that needs judgement goes to the AI.
+5. The AI reads a live snapshot of the organization, calls **MCP tools** to read or change real data, and writes a short, human answer.
+6. The reply goes back through Switch into the room. Every tool call and reply is logged with the agent's Switch identity.
+
+### Real work, not just chat
+
+The agents don't only talk. They create tasks and dependencies, record decisions and blockers, schedule reminders, request approvals — and they can **produce documents**:
+
+- *“Create a project status report PDF for Website Launch and send it here.”*
+- *“Make a one-pager on where the launch stands.”*
+
+TEAMFORGE builds a real PDF from the live project record (status, owners, dates, risks) and uploads it to the room as a **real Discord attachment** through Switch's media endpoint — not a link to a mock file. The report is generated deterministically, so it works even when the model is busy.
 
 ### Proactive, not just reactive
 
@@ -144,6 +154,7 @@ The AI creates the people, project, tasks, assignments, dependencies and memory 
 - *“Remind me tomorrow at 10 to review the launch plan.”*
 - *“The API is blocked by the payment provider — how does that affect launch?”*
 - *“What did we decide about pricing?”*
+- *“Create a project status report PDF and send it here.”*
 
 ---
 

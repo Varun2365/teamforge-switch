@@ -46,7 +46,8 @@ export function shouldRespond(
 ): boolean {
   if (handoffForMe) return true;
   if (senderKind !== 'human') return false;
+  // Explicit mention → only that agent. Otherwise exactly one voice: the operations manager.
+  // (An "addressed" flag without a parsed mention must NOT wake all six agents.)
   if (mentions.length) return addressed && mentions.includes(agentKey);
-  if (addressed) return true;
   return agentKey === 'operations-manager';
 }

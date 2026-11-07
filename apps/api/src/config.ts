@@ -22,11 +22,12 @@ const configSchema = z.object({
   ORG_SLUG: z.string().default('acme'),
   ORG_NAME: z.string().default('Teamforge Workspace'),
   ORG_TIMEZONE: z.string().default('Asia/Kolkata'),
+  PUBLIC_BASE_URL: z.string().default(''),
 
   // ── AI brain: your OpenCode plan, headless. The model decides tools, memory and replies. ──
   OPENCODE_BRAIN_DIR: z.string().default('brain'),
   OPENCODE_MODEL: z.string().default(''), // blank = OpenCode's default model
-  OPENCODE_TIMEOUT_MS: z.coerce.number().default(120000),
+  OPENCODE_TIMEOUT_MS: z.coerce.number().default(45000),
   AI_FALLBACK_DETERMINISTIC: z.string().default('true').transform((v) => v !== 'false'),
   // ── Switch relay mode (opt-in): when true, the router forwards each human message to a
   // Switch-managed AI agent (created in Switch Console) instead of calling the model locally.

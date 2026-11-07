@@ -26,6 +26,7 @@ Tasks: propose_task, create_task, get_task, search_tasks, update_task, assign_ta
 Coordination: request_status_update, create_follow_up, propose_reassignment, propose_deadline_change, create_approval_request, get_pending_approvals, record_handoff, get_upcoming_deadlines
 Scheduling: create_reminder, update_reminder, cancel_reminder, list_reminders, schedule_recurring_followup
 Risk: analyze_project_risks, find_blocked_tasks, get_affected_dependencies, generate_project_health_report
+Reports: create_pdf_report, create_project_status_pdf (the PDF is attached to your reply automatically)
 
 ## Context
 

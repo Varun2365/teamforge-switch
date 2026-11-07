@@ -60,6 +60,14 @@ export function ensureBrainConfig(): void {
   );
 }
 
+const aiLock = { tail: Promise.resolve() as Promise<unknown> };
+
+function withAiLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = aiLock.tail.then(fn, fn);
+  aiLock.tail = run.then(() => undefined, () => undefined);
+  return run;
+}
+
 /**
  * One message → OpenCode model (owner's plan) → model decides tools/memory/reply.
  * No templates, no regex routing. One persistent session per room keeps context.
@@ -74,24 +82,35 @@ export async function askTeamForgeAI(input: AiBrainInput): Promise<AiBrainResult
   }
 
   const prompt = buildPrompt(input);
+  const timeoutMs = Math.max(30_000, config.OPENCODE_TIMEOUT_MS);
 
   const args = ['run', '--format', 'json', '--title', `TeamForge ${input.roomName}`];
   if (config.OPENCODE_MODEL) args.push('--model', config.OPENCODE_MODEL);
   if (input.sessionId) args.push('--session', input.sessionId);
   args.push(prompt);
 
-  const result = await Promise.race([
-    spawnOpenCode(args, dir, Math.max(30_000, config.OPENCODE_TIMEOUT_MS)),
-    new Promise<SpawnResult>((resolve) => setTimeout(() => resolve({ stdout: '', stderr: '', error: `OpenCode watchdog fired after ${Math.round(Math.max(30_000, config.OPENCODE_TIMEOUT_MS) / 1000)}s` }), Math.max(30_000, config.OPENCODE_TIMEOUT_MS) + 5_000)),
-  ]);
+  // One model call at a time: parallel spawns only queue on the shared
+  // OpenCode server and trigger upstream rate limits.
+  let result: SpawnResult = { stdout: '', stderr: '' };
+  result = await withAiLock(async () => {    let attemptResult: SpawnResult = { stdout: '', stderr: '' };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      attemptResult = await spawnOpenCode(args, dir, timeoutMs);
+      if (!attemptResult.error) break;
+      if (!/rate.?limit|overloaded|429/i.test(attemptResult.error)) break;
+      logger.warn({ attempt: attempt + 1, agent: input.agentKey, error: attemptResult.error.slice(0, 160), promptChars: prompt.length }, 'OpenCode upstream busy; retrying once');
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 1_500));
+    }
+    return attemptResult;
+  });
   if (result.error) {
-    logger.warn({ error: result.error, agent: input.agentKey }, 'OpenCode brain failed');
+    logger.warn({ error: result.error, agent: input.agentKey, promptChars: prompt.length, elapsedMs: Date.now() - started }, 'OpenCode brain failed');
     return { ok: false, error: result.error, toolsUsed: [], durationMs: Date.now() - started };
   }
 
   const parsed = parseOpenCodeStream(result.stdout);
   const body = cleanup(parsed.text);
   if (!body) return { ok: false, error: 'OpenCode returned no text', toolsUsed: parsed.toolsUsed, durationMs: Date.now() - started };
+  logger.info({ agent: input.agentKey, ms: Date.now() - started, promptChars: prompt.length, tools: parsed.toolsUsed.length }, 'AI reply composed');
   return { ok: true, body, sessionId: parsed.sessionId ?? input.sessionId ?? undefined, toolsUsed: parsed.toolsUsed, durationMs: Date.now() - started };
 }
 
@@ -138,6 +157,7 @@ function buildPrompt(input: AiBrainInput): string {
   lines.push('- Only claim you stored, scheduled or changed something when you actually called the matching tool in this turn. Never say "I\'ve queued a note" unless you did.');
   lines.push('- If they ask for something actionable, use the tools: create_task, create_reminder/schedule_recurring_followup (use their userId for reminders), create_project, request_status_update, analyze_project_risks. Assignments and deadline changes go through approvals — say that plainly.');
   lines.push('- If they mention someone with @name, the person exists in the room; address them by name in your reply when it is a handoff or reminder.');
+  lines.push('- Reports and PDFs: when asked for a report, document, PDF, plan or summary, call create_project_status_pdf (for a project status) or create_pdf_report (for custom content), then reply in one or two sentences. The system attaches the PDF to your Discord reply automatically — do not paste the whole report as text.');
   lines.push('- Status updates MUST hit the tools: if someone says a task is complete, call complete_task (find the task first); if they give progress, call update_task; if blocked, call update_task with status blocked and record_event with the blocker. Only then acknowledge.');
   lines.push('- When the sender introduces themselves as founder/CEO/owner or says they approve scope, call update_person with senderUserId and role owner.');
   lines.push('- When someone introduces teammates, call create_person for each name with their role/title/skills. When they describe a project, call create_project; when they assign work, call create_task with assigneeUserId (find ids via search_employees) and create_task_dependency for dependencies. Do not merely describe these actions.');
@@ -161,27 +181,66 @@ function spawnOpenCode(args: string[], cwd: string, timeoutMs: number): Promise<
   return new Promise((resolvePromise) => {
     let stdout = '';
     let stderr = '';
+    let lineBuffer = '';
     let settled = false;
+    let errorDetail: string | undefined;
+
     const finish = (error?: string) => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
+      // The CLI sometimes keeps the process alive after printing its final event.
+      // Once we have the answer we don't need it any more.
+      try { child.kill('SIGKILL'); } catch { /* ignore */ }
       resolvePromise({ stdout, stderr, error });
     };
+
     const executable = resolveOpenCodeExecutable();
     // IMPORTANT: stdin must be closed ("ignore") — OpenCode's runner waits forever otherwise.
     const child = spawn(executable, args, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 
     const timer = setTimeout(() => {
-      try { child.kill('SIGKILL'); } catch { /* ignore */ }
       finish(`OpenCode timed out after ${Math.round(timeoutMs / 1000)}s`);
     }, timeoutMs);
 
-    child.stdout?.on('data', (c) => { stdout += c.toString(); });
+    const handleLine = (raw: string) => {
+      const line = raw.trim();
+      if (!line.startsWith('{')) return;
+      let obj: any;
+      try { obj = JSON.parse(line); } catch { return; }
+      if (obj.type === 'error') {
+        const kind = String(obj.error?.type ?? 'error');
+        const message = String(obj.error?.message ?? 'unknown error');
+        // Fail fast on upstream rate limits: the CLI's own retry loop wastes 60-90s.
+        errorDetail = `${kind}: ${message}`;
+        if (/rate.?limit|overloaded|429|quota/i.test(`${kind} ${message}`)) finish(errorDetail);
+        return;
+      }
+      if (obj.type === 'step_finish') {
+        const reason = String(obj.part?.reason ?? '');
+        if (reason === 'stop' || reason === 'end_turn') {
+          // Give stdout one tick to flush the final text part, then settle.
+          setTimeout(() => finish(), 120);
+        }
+      }
+    };
+
+    child.stdout?.on('data', (c) => {
+      const chunk = c.toString();
+      stdout += chunk;
+      lineBuffer += chunk;
+      let index: number;
+      while ((index = lineBuffer.indexOf('\n')) >= 0) {
+        handleLine(lineBuffer.slice(0, index));
+        lineBuffer = lineBuffer.slice(index + 1);
+        if (settled) return;
+      }
+    });
     child.stderr?.on('data', (c) => { stderr += c.toString(); });
-    child.on('error', (err) => { clearTimeout(timer); finish(err.message); });
+    child.on('error', (err) => finish(err.message));
     child.on('close', (code) => {
-      clearTimeout(timer);
-      finish(code === 0 ? undefined : `OpenCode exited ${code}: ${stderr.slice(-500) || stdout.slice(-400)}`);
+      if (lineBuffer) handleLine(lineBuffer);
+      finish(code === 0 ? undefined : errorDetail ?? `OpenCode exited ${code}: ${stderr.slice(-500) || stdout.slice(-400)}`);
     });
   });
 }

@@ -7,6 +7,7 @@ import { registerCoordinationTools } from './coordinationTools.js';
 import { registerSchedulingTools } from './schedulingTools.js';
 import { registerRiskTools } from './riskTools.js';
 import { registerPeopleTools } from './peopleTools.js';
+import { registerFileTools } from './fileTools.js';
 
 export function buildToolRegistry(): ToolRegistry {
   const reg = new ToolRegistry();
@@ -18,6 +19,7 @@ export function buildToolRegistry(): ToolRegistry {
   registerSchedulingTools(reg);
   registerRiskTools(reg);
   registerPeopleTools(reg);
+  registerFileTools(reg);
   return reg;
 }
 
