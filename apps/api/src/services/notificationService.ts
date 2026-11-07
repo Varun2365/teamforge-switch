@@ -15,6 +15,8 @@ export interface DeliverInput {
   critical?: boolean; // bypasses quiet hours / frequency caps
   quietHoursOverride?: boolean;
   source?: string; // which worker/agent triggered this
+  mentionUserIds?: string[]; // people to @mention in the room
+  agentKey?: import('../integrations/switch/catalog.js').AgentKey; // keep proactive voice consistent
 }
 
 export interface DeliverResult {
@@ -78,7 +80,7 @@ export async function deliverNotification(input: DeliverInput): Promise<DeliverR
     const runtime = getSwitchRuntime();
     if (runtime?.getStatus().running && runtime.getStatus().onlineAgents > 0) {
       const targetRoom = input.targetId && !input.targetId.startsWith('teamforge-') ? input.targetId : undefined;
-      const res = await runtime.deliverProactive({ title: input.title ?? input.kind ?? 'Update', body: input.body, roomId: targetRoom });
+      const res = await runtime.deliverProactive({ title: input.title ?? input.kind ?? 'Update', body: input.body, roomId: targetRoom, mentionUserIds: input.mentionUserIds, agentKey: input.agentKey });
       if (res.ok) {
         await NotificationModel.updateOne({ _id: record._id }, { $set: { status: 'sent', sentAt: new Date(), deliveredVia: 'switch' } });
         await logAgentAction(orgId, input.source ?? 'scheduler', 'proactive_post', { roomId: targetRoom, detail: { kind: input.kind }, outputSummary: input.body.slice(0, 200) });

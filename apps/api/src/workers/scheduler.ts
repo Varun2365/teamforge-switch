@@ -95,11 +95,13 @@ async function executeJob(job: { _id: string; orgId: string; kind: string; paylo
         targetType,
         targetId,
         title: reminder.title,
-        body: reminder.body ?? reminder.title,
+        body: reminder.body && !/^\s*remind me/i.test(reminder.body) ? reminder.body : "It's time.",
         kind: 'reminder',
         dedupeKey: `reminder:${reminder._id}:${dueIso}`,
         quietHoursOverride: reminder.quietHoursOverride,
         source: 'scheduler:reminder',
+        mentionUserIds: reminder.userId ? [String(reminder.userId)] : undefined,
+        agentKey: 'operations-manager',
       });
       reminder.status = res.status === 'failed' ? 'failed' : 'sent';
       reminder.lastSentAt = new Date();

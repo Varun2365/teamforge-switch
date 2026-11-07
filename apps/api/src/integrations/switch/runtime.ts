@@ -140,10 +140,10 @@ class SwitchRuntime {
     await this.persistIntegration('disconnected', 'runtime stopped');
   }
 
-  async deliverProactive(input: { title: string; body: string; mentionNames?: string[]; mentionUserIds?: string[]; roomId?: string }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  async deliverProactive(input: { title: string; body: string; mentionNames?: string[]; mentionUserIds?: string[]; roomId?: string; agentKey?: AgentKey }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
     if (!this.configured) return { ok: false, error: 'Switch not configured' };
     try {
-      const preferred = chooseAgent(`${input.title} ${input.body}`, 'operations-manager');
+      const preferred = input.agentKey ?? chooseAgent(`${input.title} ${input.body}`, 'operations-manager');
       const mentionNames = [...(input.mentionNames ?? [])];
       if (input.mentionUserIds?.length) mentionNames.push(...(await this.participantNamesForUsers(input.mentionUserIds)));
       const messageId = await this.postAsAgent(preferred, `**${input.title}**\n\n${input.body}`, { targetNames: mentionNames, roomId: input.roomId ?? this.roomId ?? undefined });
