@@ -18,6 +18,18 @@ export async function buildApp() {
   });
 
   await app.register(cors, { origin: [config.WEB_ORIGIN, 'http://127.0.0.1:5183', 'http://localhost:5183'], credentials: false });
+  // Treat an empty JSON body as {} so simple POST actions don't need a payload.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    const text = typeof body === 'string' ? body : body.toString();
+    if (!text || !text.trim()) return done(null, {});
+    try {
+      done(null, JSON.parse(text));
+    } catch (err) {
+      const error = err as Error & { statusCode?: number };
+      error.statusCode = 400;
+      done(error, undefined);
+    }
+  });
   app.addHook('onRequest', createAuthHook());
 
   app.setErrorHandler((err: unknown, _req, reply) => {
