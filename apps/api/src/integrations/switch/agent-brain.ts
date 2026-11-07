@@ -187,11 +187,12 @@ async function operationsReply(message: AgentMessage, use: (n: string, i?: Recor
   const skillMatch = lower.match(/\bwho\s+(?:knows|has experience (?:with|in)|works with)\s+([a-z0-9.+# ]{2,40})/);
   if (skillMatch) {
     const skill = skillMatch[1]!.trim();
+    const skillLabel = skill.charAt(0).toUpperCase() + skill.slice(1);
     const people = await use('search_employees', { skill });
     if (Array.isArray(people) && people.length) {
-      return `${people.slice(0, 4).map((p: any) => p.name).join(', ')} — that's who I'd point you to for ${skill}. Want me to loop any of them in?`;
+      return `${people.slice(0, 4).map((p: any) => p.name).join(', ')} — that's who I'd point you to for ${skillLabel}. Want me to loop any of them in?`;
     }
-    return `Nothing on record for ${skill} yet. If someone here has it, say who and I'll pin it to their profile.`;
+    return `Nothing on record for ${skillLabel} yet. If someone here has it, say who and I'll pin it to their profile.`;
   }
 
   // 4) "what did we decide / agreed about X"
@@ -215,7 +216,7 @@ async function operationsReply(message: AgentMessage, use: (n: string, i?: Recor
       const owner = task.assignees?.[0]?.name ?? 'nobody yet';
       const deps = await use('get_task_dependencies', { taskId: task.id ?? task._id });
       const waitingOn = (deps?.dependsOn ?? []).map((d: any) => d?.task?.title).filter(Boolean);
-      const lines = [`${owner.split(' ')[0]} has ${task.title} — ${task.status.replace(/_/g, ' ')}, due ${dateLabel(task.dueDate)}.`];
+      const lines = [`${owner.split(' ')[0]} is on it — ${task.title}, due ${dateLabel(task.dueDate)} (${task.status.replace(/_/g, ' ')}).`];
       if (waitingOn.length) lines.push(`It's waiting on ${waitingOn.join(' and ')}.`);
       return lines.join(' ');
     }
