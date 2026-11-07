@@ -443,6 +443,18 @@ interface ParsedReminderIntent {
 }
 
 function parseReminderIntent(body: string): ParsedReminderIntent | null {
+  // "remind me in 3 minutes to review the plan" — relative, easiest for demos.
+  const relative = body.match(/\bremind\s+me\s+in\s+(\d+)\s*(minutes?|mins?|hours?|hrs?)\s+(?:to\s+)?(.+)$/i);
+  if (relative) {
+    const amount = Number(relative[1]);
+    const unit = relative[2]!.toLowerCase().startsWith('h') ? 3_600_000 : 60_000;
+    const dueAt = new Date(Date.now() + amount * unit);
+    const title = clean(relative[3]!.replace(/^that\s+/i, '').replace(/^to\s+/i, ''));
+    if (title.length < 3) return null;
+    const whenLabel = dueAt.toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    return { title: title.charAt(0).toUpperCase() + title.slice(1), body, dueAt, whenLabel };
+  }
+
   // Two natural orders: "remind me at 7:45pm to review the plan"
   // and "remind me to review the plan at 7:45pm".
   let tail = '';
