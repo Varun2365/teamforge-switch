@@ -21,3 +21,8 @@ screen-recording.md
 
 # Local blog draft (not published in the repo)
 blog.md
+
+# Local prototype video artifacts
+prototype_video/
+main.mp3
+transcript.json
