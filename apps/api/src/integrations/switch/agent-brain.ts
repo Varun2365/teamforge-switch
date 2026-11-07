@@ -179,7 +179,7 @@ async function operationsReply(message: AgentMessage, use: (n: string, i?: Recor
       roomId: message.roomId ?? null,
       idempotencyKey: `agent:reminder:${message.messageId ?? body.slice(0, 32)}`,
     });
-    if (result) return `Done — I'll nudge you ${reminder.whenLabel} to ${reminder.title.toLowerCase()}.`;
+    if (result) return `Done — I'll nudge you ${reminder.whenLabel}: ${reminder.title}.`;
     return `I heard you want a reminder, but the reminder service balked. Try me again in a bit.`;
   }
 
@@ -444,11 +444,12 @@ interface ParsedReminderIntent {
 }
 
 function parseReminderIntent(body: string): ParsedReminderIntent | null {
-  // "remind me in 3 minutes to review the plan" — relative, easiest for demos.
-  const relative = body.match(/\bremind\s+me\s+in\s+(\d+)\s*(minutes?|mins?|hours?|hrs?)\s+(?:to\s+)?(.+)$/i);
+  // "remind me in 30 seconds to review the plan" — relative, easiest for demos.
+  const relative = body.match(/\bremind\s+me\s+in\s+(\d+)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)\s+(?:to\s+)?(.+)$/i);
   if (relative) {
     const amount = Number(relative[1]);
-    const unit = relative[2]!.toLowerCase().startsWith('h') ? 3_600_000 : 60_000;
+    const unitText = relative[2]!.toLowerCase();
+    const unit = unitText.startsWith('h') ? 3_600_000 : unitText.startsWith('m') ? 60_000 : 1_000;
     const dueAt = new Date(Date.now() + amount * unit);
     const title = clean(relative[3]!.replace(/^that\s+/i, '').replace(/^to\s+/i, ''));
     if (title.length < 3) return null;

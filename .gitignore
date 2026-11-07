@@ -1,4 +1,4 @@
-node_modules/
+﻿node_modules/
 dist/
 .env
 .env.local
@@ -17,6 +17,7 @@ apps/api/live.log
 # Local-only demo/recording runbook
 RECORDING.md
 elevenlabs.md
+screen-recording.md
 
 # Local blog draft (not published in the repo)
 blog.md
